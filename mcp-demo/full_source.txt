@@ -1,0 +1,5495 @@
+\n===== FILE: ./pom.xml =====\n
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>mcp-poc</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>MCP POC</name>
+    <description>MCP + CAMARA + SSE Async POC</description>
+
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+\n===== FILE: ./run.sh =====\n
+#!/bin/bash
+# .env yüklenip uygulama çalıştırılır. Önce: cp env.example .env  ve  .env içine GEMINI_API_KEY yazın.
+
+set -e
+cd "$(dirname "$0")"
+
+if [ ! -f .env ]; then
+  echo "Hata: .env bulunamadı. Önce: cp env.example .env"
+  echo "Ardından .env içine GEMINI_API_KEY değerini yazın."
+  exit 1
+fi
+
+set -a
+source .env
+set +a
+
+if [ -z "${GEMINI_API_KEY}" ] || [ "${GEMINI_API_KEY}" = "your-gemini-api-key-here" ]; then
+  echo "Hata: GEMINI_API_KEY .env içinde tanımlı değil veya placeholder. Gerçek key girin."
+  exit 1
+fi
+
+exec mvn spring-boot:run
+\n===== FILE: ./src/main/resources/static/index.html =====\n
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP + CAMARA — Microservice Architecture POC</title>
+    <style>
+        :root {
+            /* Clean, simple color palette */
+            --bg-primary: #f8f9fa;
+            --bg-secondary: #ffffff;
+            --border-color: #e1e4e8;
+            --text-primary: #24292e;
+            --text-secondary: #586069;
+            --accent-blue: #0366d6;
+            --accent-green: #28a745;
+            --accent-orange: #f66a0a;
+            --accent-purple: #6f42c1;
+            --accent-red: #d73a49;
+
+            /* Node colors - muted pastels */
+            --node-user: #e8f4fd;
+            --node-agent: #f0f4ff;
+            --node-mcp: #f0fff4;
+            --node-camara: #fff8f0;
+            --node-network: #fdf4ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .header-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .header-meta .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .badge.connected {
+            background: #dcffe4;
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+
+        .badge.mock {
+            background: #fff3cd;
+            border-color: var(--accent-orange);
+            color: #856404;
+        }
+
+        /* Main layout */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            min-height: calc(100vh - 70px);
+        }
+
+        /* Architecture visualization */
+        .architecture-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        /* Microservice Nodes Layout */
+        .microservices-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .node {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .node.active {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1);
+        }
+
+        .node.completed {
+            border-color: var(--accent-green);
+        }
+
+        .node-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .node-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .node-port {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-family: monospace;
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .node-status {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .node-status.running {
+            background: var(--accent-green);
+        }
+
+        .node-status.waiting {
+            background: var(--accent-orange);
+        }
+
+        .node-status.processing {
+            background: var(--accent-blue);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* Node specific colors */
+        .node.user {
+            background: var(--node-user);
+        }
+
+        .node.agent {
+            background: var(--node-agent);
+        }
+
+        .node.mcp {
+            background: var(--node-mcp);
+        }
+
+        .node.camara {
+            background: var(--node-camara);
+        }
+
+        .node.network {
+            background: var(--node-network);
+        }
+
+        /* Flow arrows */
+        .flow-arrows {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 0 40px;
+        }
+
+        .arrow-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 18px;
+            position: relative;
+        }
+
+        .arrow-container.active {
+            color: var(--accent-blue);
+        }
+
+        .arrow-label {
+            position: absolute;
+            font-size: 10px;
+            top: -12px;
+            white-space: nowrap;
+        }
+
+        /* Flow Steps Timeline */
+        .flow-timeline {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 16px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid var(--border-color);
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+
+        .flow-step.active {
+            border-left-color: var(--accent-blue);
+            background: #f6f8fa;
+        }
+
+        .flow-step.completed {
+            border-left-color: var(--accent-green);
+        }
+
+        .step-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .step-number.completed {
+            background: var(--accent-green);
+            color: white;
+            border-color: var(--accent-green);
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-route {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .step-description {
+            color: var(--text-primary);
+        }
+
+        .step-detail {
+            font-size: 10px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            color: var(--accent-blue);
+            background: #f0f7ff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 6px;
+            display: none;
+            word-break: break-word;
+            border-left: 2px solid var(--accent-blue);
+        }
+
+        .flow-step.completed .step-detail {
+            color: var(--accent-green);
+            background: #f0fff4;
+            border-left-color: var(--accent-green);
+        }
+
+        /* Control Panel (Right sidebar) */
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .control-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        /* Input section */
+        .question-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .question-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1);
+        }
+
+        .example-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .example-btn {
+            padding: 6px 10px;
+            font-size: 11px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .example-btn:hover {
+            background: var(--border-color);
+        }
+
+        /* Mode buttons */
+        .mode-buttons {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .mode-btn,
+        .variant-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mode-btn:hover,
+        .variant-btn:hover {
+            background: var(--border-color);
+        }
+
+        .mode-btn.active {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+
+        .variant-btn.active {
+            background: var(--accent-green);
+            color: white;
+            border-color: var(--accent-green);
+        }
+
+        .current-mode-display {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 8px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            margin-bottom: 12px;
+        }
+
+        .current-mode-display strong {
+            color: var(--accent-blue);
+        }
+
+        .run-btn {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .run-btn:hover:not(:disabled) {
+            background: #0256bb;
+        }
+
+        .run-btn:disabled {
+            background: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        /* Response section */
+        .response-box {
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 13px;
+            min-height: 100px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        /* Network state section */
+        .network-state {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .state-item {
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .state-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .state-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        /* Node details panel */
+        .node-details {
+            display: none;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 12px;
+        }
+
+        .node-details.visible {
+            display: block;
+        }
+
+        .node-details h4 {
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .node-details pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 11px;
+            overflow-x: auto;
+            max-height: 150px;
+        }
+
+        /* Endpoint display */
+        .endpoint-list {
+            font-size: 11px;
+            font-family: monospace;
+        }
+
+        .endpoint-item {
+            padding: 6px 8px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .method-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .method-badge.get {
+            background: #dcffe4;
+            color: #28a745;
+        }
+
+        .method-badge.post {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .method-badge.delete {
+            background: #fce8e8;
+            color: #d73a49;
+        }
+
+        /* Log panel */
+        .log-panel {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 2px 0;
+        }
+
+        .log-timestamp {
+            color: #6a9955;
+        }
+
+        .log-service {
+            color: #569cd6;
+        }
+
+        .log-message {
+            color: #d4d4d4;
+        }
+
+        /* Animation for data flow */
+        @keyframes dataFlow {
+            0% {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .data-flow-indicator {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            animation: dataFlow 1s ease-in-out;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+
+            .microservices-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <h1>🔌 MCP + CAMARA Architecture POC</h1>
+        <div class="header-meta">
+            <span class="badge connected" id="connectionStatus">● Backend Connected</span>
+            <span class="badge mock" id="modeStatus">MOCK Mode</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Architecture Visualization Panel -->
+        <div class="architecture-panel">
+            <div class="panel-header">
+                <span class="panel-title">Microservice Architecture Flow</span>
+                <button class="example-btn" onclick="resetFlow()">↺ Reset</button>
+            </div>
+
+            <!-- Microservice Nodes -->
+            <div class="microservices-grid">
+                <div class="node user" id="node-user" onclick="showNodeDetails('user')">
+                    <div class="node-status running"></div>
+                    <div class="node-icon">👤</div>
+                    <div class="node-name">User Interface</div>
+                    <div class="node-port">:8080</div>
+                </div>
+
+                <div class="node agent" id="node-agent" onclick="showNodeDetails('agent')">
+                    <div class="node-status"></div>
+                    <div class="node-icon">🤖</div>
+                    <div class="node-name">AI Agent + LLM</div>
+                    <div class="node-port">:8081</div>
+                </div>
+
+                <div class="node mcp" id="node-mcp" onclick="showNodeDetails('mcp')">
+                    <div class="node-status"></div>
+                    <div class="node-icon">🔌</div>
+                    <div class="node-name">MCP Server</div>
+                    <div class="node-port">:8082</div>
+                </div>
+
+                <div class="node camara" id="node-camara" onclick="showNodeDetails('camara')">
+                    <div class="node-status"></div>
+                    <div class="node-icon">📡</div>
+                    <div class="node-name">CAMARA API</div>
+                    <div class="node-port">:8083</div>
+                </div>
+
+                <div class="node network" id="node-network" onclick="showNodeDetails('network')">
+                    <div class="node-status running"></div>
+                    <div class="node-icon">📶</div>
+                    <div class="node-name">Telco Network</div>
+                    <div class="node-port">:8084</div>
+                </div>
+            </div>
+
+            <!-- Node Details (collapsible) -->
+            <div class="node-details" id="nodeDetails">
+                <h4 id="nodeDetailsTitle">Select a node to view details</h4>
+                <div id="nodeDetailsContent"></div>
+            </div>
+
+            <!-- Flow Timeline -->
+            <div class="panel-header" style="margin-top: 20px;">
+                <span class="panel-title">Execution Flow (13 Steps)</span>
+            </div>
+
+            <div class="flow-timeline" id="flowTimeline">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🚀</div>
+                    <p>Bir soru girin ve "Run Agent" butonuna tıklayın</p>
+                    <p style="font-size: 12px; margin-top: 8px;">Flow adımları burada görünecek</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <!-- Input Section -->
+            <div class="control-section">
+                <div class="section-title">💬 User Input</div>
+                <textarea class="question-input" id="questionInput"
+                    placeholder="Doğal dilde komut girin...">Mevcut bandwidth durumum nedir?</textarea>
+
+                <div class="example-buttons">
+                    <button class="example-btn" onclick="setQuestion('Mevcut bandwidth durumum nedir?')">📊
+                        Status</button>
+                    <button class="example-btn" onclick="setQuestion('Hızımı 700 yap')">⚡ 700 Mbps</button>
+                    <button class="example-btn" onclick="setQuestion('QoS session oluştur')">🔧 Create</button>
+                    <button class="example-btn" onclick="setQuestion('Session sonlandır')">🛑 End</button>
+                </div>
+
+                <!-- Mode Selector -->
+                <div class="section-title" style="margin-top: 12px;">⚙️ Execution Mode</div>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" id="modeAsync" onclick="setMode('async')">🔄 Async (SSE)</button>
+                    <button class="mode-btn" id="modeSync" onclick="setMode('sync')">⏱ Sync</button>
+                </div>
+
+                <div class="mode-buttons" style="margin-top: 8px;">
+                    <button class="variant-btn active" id="varClean" onclick="setVariant('clean')">Clean</button>
+                    <button class="variant-btn" id="varContext" onclick="setVariant('context')">With Context</button>
+                    <button class="variant-btn" id="varAction" onclick="setVariant('action')">Action</button>
+                </div>
+
+                <div class="current-mode-display" id="currentModeDisplay">
+                    Mode: <strong>ASYNC_CLEAN</strong>
+                </div>
+
+                <button class="run-btn" id="runBtn" onclick="runAgent()">▶ Run Agent</button>
+            </div>
+
+            <!-- Response Section -->
+            <div class="control-section">
+                <div class="section-title">💬 LLM Response</div>
+                <div class="response-box" id="responseBox">
+                    Yanıt burada görünecek...
+                </div>
+            </div>
+
+            <!-- Network State -->
+            <div class="control-section">
+                <div class="section-title">📶 Network State</div>
+                <div class="network-state">
+                    <div class="state-item">
+                        <div class="state-value" id="currentBandwidth">500</div>
+                        <div class="state-label">Current Mbps</div>
+                    </div>
+                    <div class="state-item">
+                        <div class="state-value" id="activeSession">-</div>
+                        <div class="state-label">Session</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endpoints -->
+            <div class="control-section">
+                <div class="section-title">🔗 Active Endpoints</div>
+                <div class="endpoint-list">
+                    <div class="endpoint-item">
+                        <span class="method-badge get">GET</span>
+                        <span>/mcp/agent/run</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method-badge post">POST</span>
+                        <span>/mcp/jsonrpc</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method-badge get">GET</span>
+                        <span>/camara/qod/status</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompt Log (New) -->
+            <div class="control-section">
+                <div class="section-title">📝 LLM Context / Prompt</div>
+                <div class="response-box" id="promptBox"
+                    style="height: 120px; font-size: 10px; font-family: monospace; white-space: pre-wrap; overflow-y: auto;">
+                    Prompt will appear here...
+                </div>
+            </div>
+
+            <!-- Logs -->
+            <div class="control-section">
+                <div class="section-title">📋 System Logs</div>
+                <div class="log-panel" id="logPanel">
+                    <div class="log-entry">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span class="log-service">[System]</span>
+                        <span class="log-message">Ready to execute...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let eventSource = null;
+        let currentStep = 0;
+        let isRunning = false;
+
+        // Node details data
+        const nodeInfo = {
+            user: {
+                title: '👤 User Interface (Frontend)',
+                port: ':8080',
+                description: 'Kullanıcı ile etkileşim katmanı. Doğal dil komutlarını alır, SSE ile gerçek zamanlı güncellemeleri gösterir.',
+                endpoints: [
+                    { method: 'GET', path: '/', desc: 'Web UI' },
+                    { method: 'GET', path: '/new-version.html', desc: 'This page' }
+                ],
+                responsibilities: ['Kullanıcı input alma', 'SSE stream dinleme', 'Sonuç gösterme']
+            },
+            agent: {
+                title: '🤖 AI Agent + LLM Service',
+                port: ':8081',
+                description: 'ReAct pattern ile çalışan AI agent. Gemini LLM ile iletişim kurar, tool keşfi ve çağrımı yapar.',
+                endpoints: [
+                    { method: 'GET', path: '/mcp/agent/run', desc: 'SSE streaming agent' },
+                    { method: 'GET', path: '/mcp/agent/run-sync', desc: 'Sync agent' }
+                ],
+                responsibilities: ['Tool discovery (tools/list)', 'LLM ile reasoning', 'Tool execution (tools/call)', 'Max 5 iterasyon ReAct loop']
+            },
+            mcp: {
+                title: '🔌 MCP Server',
+                port: ':8082',
+                description: 'Model Context Protocol sunucusu. JSON-RPC 2.0 üzerinden tool tanımları sunar ve çağrıları yönlendirir.',
+                endpoints: [
+                    { method: 'POST', path: '/mcp/jsonrpc', desc: 'JSON-RPC 2.0 endpoint' },
+                    { method: 'GET', path: '/mcp/tools', desc: 'Tool list (simple)' }
+                ],
+                responsibilities: ['tools/list - 5 CAMARA tool tanımı', 'tools/call - Tool çağrılarını execute', 'initialize - Bağlantı başlatma']
+            },
+            camara: {
+                title: '📡 CAMARA API (Mock/Real)',
+                port: ':8083',
+                description: 'CAMARA QoD API v1.1.0 uyumlu telekom API. Mock veya gerçek operatör API\'sine bağlanır.',
+                endpoints: [
+                    { method: 'GET', path: '/camara/qod/status', desc: 'QoD durumu' },
+                    { method: 'POST', path: '/camara/qod/set-bandwidth', desc: 'Bandwidth ayarla' },
+                    { method: 'GET', path: '/camara/device-location', desc: 'Cihaz konumu' }
+                ],
+                responsibilities: ['QoS session yönetimi', 'Device location', 'OAuth 2.0 authentication (real mode)']
+            },
+            network: {
+                title: '📶 Telco Network (Simulated)',
+                port: ':8084',
+                description: 'Simüle edilmiş telekom ağ durumu. Bandwidth ve QoS değerlerini memory\'de tutar.',
+                endpoints: [],
+                responsibilities: ['Bandwidth state (100-1000 Mbps)', 'Session state', 'Network response simulation']
+            }
+        };
+
+        // Flow steps definition - detailed descriptions matching README diagram
+        let flowSteps = [
+            { step: 1, from: 'user', to: 'agent', route: 'USER → CLIENT (Agent)', desc: 'Kullanıcı komutu gönderdi', detail: '' },
+            { step: 2, from: 'agent', to: 'mcp', route: 'Agent → MCP Server', desc: 'Tool discovery isteği', detail: 'POST /mcp/jsonrpc {"method": "tools/list"}' },
+            { step: 3, from: 'mcp', to: 'agent', route: 'MCP Server → Agent', desc: 'Tool tanımları alındı', detail: '' },
+            { step: 4, from: 'agent', to: 'agent', route: 'Agent → LLM (Gemini)', desc: 'Soru + tool tanımları gönderildi', detail: '' },
+            { step: 5, from: 'agent', to: 'agent', route: 'LLM → Agent', desc: 'Function call kararı alındı', detail: '' },
+            { step: 6, from: 'agent', to: 'mcp', route: 'Agent → MCP Server', desc: 'Tool çağrısı isteği', detail: '' },
+            { step: 7, from: 'mcp', to: 'camara', route: 'MCP Server → CAMARA API', desc: 'CAMARA API çağrısı', detail: '' },
+            { step: 8, from: 'camara', to: 'network', route: 'CAMARA → Network', desc: 'Ağ işlemi yapılıyor', detail: '' },
+            { step: 9, from: 'network', to: 'camara', route: 'Network → CAMARA', desc: 'Ağ işlemi tamamlandı', detail: '' },
+            { step: 10, from: 'camara', to: 'mcp', route: 'CAMARA → MCP Server', desc: 'API yanıtı döndü', detail: '' },
+            { step: 11, from: 'mcp', to: 'agent', route: 'MCP Server → Agent', desc: 'Tool sonucu alındı', detail: '' },
+            { step: 12, from: 'agent', to: 'agent', route: 'Agent → LLM', desc: 'Final yanıt üretiliyor', detail: '' },
+            { step: 13, from: 'agent', to: 'user', route: 'Agent → USER', desc: 'Kullanıcıya yanıt gönderildi', detail: '' }
+        ];
+
+        // Animation delay (ms) - slower for human readability
+        const STEP_DELAY = 1200;
+
+        // Mode state
+        let currentMode = 'async';  // 'async' or 'sync'
+        let currentVariant = 'clean'; // 'clean', 'context', or 'action'
+
+        // Set execution mode (async/sync)
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('modeAsync').classList.toggle('active', mode === 'async');
+            document.getElementById('modeSync').classList.toggle('active', mode === 'sync');
+            updateModeDisplay();
+        }
+
+        // Set execution variant (clean/context/action)
+        function setVariant(variant) {
+            currentVariant = variant;
+            document.getElementById('varClean').classList.toggle('active', variant === 'clean');
+            document.getElementById('varContext').classList.toggle('active', variant === 'context');
+            document.getElementById('varAction').classList.toggle('active', variant === 'action');
+            updateModeDisplay();
+        }
+
+        // Update mode display
+        function updateModeDisplay() {
+            const modeName = currentMode.toUpperCase() + '_' + currentVariant.toUpperCase();
+            document.getElementById('currentModeDisplay').innerHTML = 'Mode: <strong>' + modeName + '</strong>';
+        }
+
+        // Set question
+        function setQuestion(q) {
+            document.getElementById('questionInput').value = q;
+        }
+
+        // Show node details
+        function showNodeDetails(nodeId) {
+            const info = nodeInfo[nodeId];
+            const details = document.getElementById('nodeDetails');
+            const title = document.getElementById('nodeDetailsTitle');
+            const content = document.getElementById('nodeDetailsContent');
+
+            title.textContent = info.title + ' ' + info.port;
+
+            let html = `<p style="margin-bottom: 12px;">${info.description}</p>`;
+
+            if (info.endpoints.length > 0) {
+                html += '<div style="margin-bottom: 8px;"><strong>Endpoints:</strong></div>';
+                info.endpoints.forEach(ep => {
+                    const badgeClass = ep.method.toLowerCase();
+                    html += `<div class="endpoint-item"><span class="method-badge ${badgeClass}">${ep.method}</span><span>${ep.path}</span></div>`;
+                });
+            }
+
+            html += '<div style="margin-top: 12px;"><strong>Responsibilities:</strong></div><ul style="margin-left: 16px; margin-top: 4px;">';
+            info.responsibilities.forEach(r => {
+                html += `<li style="font-size: 11px;">${r}</li>`;
+            });
+            html += '</ul>';
+
+            content.innerHTML = html;
+            details.classList.add('visible');
+
+            // Highlight selected node
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+            document.getElementById('node-' + nodeId).classList.add('active');
+        }
+
+        // Add log entry
+        function addLog(service, message) {
+            const panel = document.getElementById('logPanel');
+            const time = new Date().toLocaleTimeString('tr-TR');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-timestamp">[${time}]</span> <span class="log-service">[${service}]</span> <span class="log-message">${message}</span>`;
+            panel.appendChild(entry);
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        // Update flow timeline with detailed info
+        function updateFlowStep(stepIndex, status, extraDetail) {
+            const timeline = document.getElementById('flowTimeline');
+
+            if (stepIndex === 0 && status === 'init') {
+                // Clear timeline and add all steps
+                timeline.innerHTML = '';
+                const stepIcons = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬';
+                flowSteps.forEach((step, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'flow-step';
+                    div.id = 'step-' + step.step;
+                    div.innerHTML = '<span class="step-number">' + stepIcons[step.step - 1] + '</span>' +
+                        '<div class="step-content">' +
+                        '<div class="step-route">' + step.route + '</div>' +
+                        '<div class="step-description">' + step.desc + '</div>' +
+                        '<div class="step-detail" id="step-detail-' + step.step + '"></div>' +
+                        '</div>';
+                    timeline.appendChild(div);
+                });
+                return;
+            }
+
+            const stepEl = document.getElementById('step-' + (stepIndex + 1));
+            const detailEl = document.getElementById('step-detail-' + (stepIndex + 1));
+
+            if (stepEl) {
+                if (status === 'active') {
+                    // Remove active from all others
+                    document.querySelectorAll('.flow-step.active').forEach(el => {
+                        el.classList.remove('active');
+                    });
+
+                    stepEl.classList.add('active');
+                    stepEl.classList.remove('completed');
+                    stepEl.querySelector('.step-number').classList.remove('completed');
+
+                    // Update node status
+                    const step = flowSteps[stepIndex];
+                    setNodeStatus(step.from, 'processing');
+                    if (step.to !== step.from) {
+                        setNodeStatus(step.to, 'waiting');
+                    }
+
+                    // Update detail if provided
+                    if (extraDetail && detailEl) {
+                        detailEl.textContent = extraDetail;
+                        detailEl.style.display = 'block';
+                    }
+                } else if (status === 'completed') {
+                    stepEl.classList.remove('active');
+                    stepEl.classList.add('completed');
+                    stepEl.querySelector('.step-number').classList.add('completed');
+
+                    // Update detail if provided
+                    if (extraDetail && detailEl) {
+                        detailEl.textContent = extraDetail;
+                        detailEl.style.display = 'block';
+                    }
+                }
+
+                stepEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // Set node status
+        function setNodeStatus(nodeId, status) {
+            const node = document.getElementById('node-' + nodeId);
+            if (!node) return;
+
+            const statusEl = node.querySelector('.node-status');
+            statusEl.className = 'node-status ' + status;
+        }
+
+        // Reset flow
+        function resetFlow() {
+            currentStep = 0;
+            document.getElementById('flowTimeline').innerHTML =
+                '<div class="empty-state">' +
+                '<div class="empty-state-icon">🚀</div>' +
+                '<p>Bir soru girin ve "Run Agent" butonuna tıklayın</p>' +
+                '<p style="font-size: 12px; margin-top: 8px;">Flow adımları burada görünecek</p>' +
+                '</div>';
+            document.querySelectorAll('.node').forEach(n => {
+                n.classList.remove('active', 'completed');
+                n.querySelector('.node-status').className = 'node-status';
+            });
+            setNodeStatus('user', 'running');
+            setNodeStatus('network', 'running');
+            document.getElementById('nodeDetails').classList.remove('visible');
+            document.getElementById('responseBox').textContent = 'Yanıt burada görünecek...';
+        }
+
+        // Run agent
+        async function runAgent() {
+            if (isRunning) return;
+            isRunning = true;
+
+            const question = document.getElementById('questionInput').value;
+            const btn = document.getElementById('runBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Running...';
+
+            // Initialize flow
+            updateFlowStep(0, 'init');
+            addLog('UI', 'Agent başlatılıyor [' + currentMode.toUpperCase() + '_' + currentVariant.toUpperCase() + ']: ' + question);
+
+            const encodedQ = encodeURIComponent(question);
+
+            // Branch based on mode
+            if (currentMode === 'sync') {
+                // SYNC mode - use fetch
+                runAgentSync(encodedQ);
+            } else {
+                // ASYNC mode - use SSE
+                runAgentAsync(encodedQ);
+            }
+        }
+
+        // Sync mode execution
+        async function runAgentSync(encodedQ) {
+            try {
+                addLog('Mode', 'SYNC mode - tek HTTP istek yapılıyor');
+
+                // Update first step
+                const userQ = document.getElementById('questionInput').value;
+                updateFlowStep(0, 'active', '"' + userQ + '"');
+
+                const includeStatus = (currentVariant === 'context' || currentVariant === 'action-context');
+                const response = await fetch('/mcp/agent/run-sync?question=' + encodedQ + '&includeStatus=' + includeStatus);
+                const data = await response.json();
+
+                // Show result
+                document.getElementById('responseBox').textContent = data.response;
+                addLog('Result', 'İşlem tamamlandı. Success: ' + data.success);
+
+                // Animate through all steps quickly for sync mode
+                for (let i = 0; i < 13; i++) {
+                    setTimeout(function () {
+                        updateFlowStep(i, 'completed');
+                        if (i < 12) updateFlowStep(i + 1, 'active');
+                    }, i * 200);
+                }
+
+                setTimeout(function () {
+                    finishRun();
+                    refreshQodStatus();
+                }, 2600);
+
+            } catch (error) {
+                addLog('Error', 'Sync istek hatası: ' + error.message);
+                finishRun();
+            }
+        }
+
+        // Async mode execution (SSE)
+        function runAgentAsync(encodedQ) {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            const includeStatus = (currentVariant === 'context' || currentVariant === 'action-context');
+            eventSource = new EventSource('/mcp/agent/run?question=' + encodedQ + '&includeStatus=' + includeStatus);
+
+            // Track current step for animation
+            let animStep = 0;
+
+            eventSource.addEventListener('status', function (e) {
+                const data = JSON.parse(e.data);
+                addLog('Agent', data.message);
+
+                // Step 1: User command received
+                if (animStep === 0) {
+                    const userQ = document.getElementById('questionInput').value;
+                    updateFlowStep(0, 'active', '"' + userQ + '"');
+                    animStep = 1;
+                }
+            });
+
+            eventSource.addEventListener('trace', function (e) {
+                const data = JSON.parse(e.data);
+                addLog('Trace', '[' + data.type + '] ' + data.description);
+
+                // Map trace type to flow steps with meaningful delays
+                if (data.type === 'PROMPT') {
+                    // Show Prompt
+                    const promptBox = document.getElementById('promptBox');
+                    promptBox.textContent = JSON.stringify(data.data, null, 2);
+                    addLog('Agent', 'Prompt LLM\'e gönderildi (' + JSON.stringify(data.data).length + ' chars)');
+
+                } else if (data.type === 'TOOL_DISCOVERY') {
+                    // Step 1 complete, animate steps 2-3 (tool discovery)
+                    updateFlowStep(0, 'completed');
+
+                    setTimeout(function () {
+                        updateFlowStep(1, 'active', 'POST /mcp/jsonrpc → {"method": "tools/list"}');
+                    }, STEP_DELAY);
+
+                    setTimeout(function () {
+                        // Extract tool count from description
+                        const toolCount = data.description.match(/\d+/) || ['5'];
+                        updateFlowStep(1, 'completed');
+                        updateFlowStep(2, 'active', toolCount[0] + ' tool alındı: get_network_context, get_qod_context, create_qos_session, end_qos_session, extend_qos_session');
+                    }, STEP_DELAY * 2);
+
+                    setTimeout(function () {
+                        updateFlowStep(2, 'completed');
+                        updateFlowStep(3, 'active', 'Gemini\'e gönderiliyor: Kullanıcı sorusu + 5 tool tanımı (JSON Schema)');
+                    }, STEP_DELAY * 3);
+
+                    animStep = 4;
+
+                } else if (data.type === 'LLM_TOOL_CALL') {
+                    // Extract tool name from description
+                    const toolMatch = data.description.match(/: (.+)$/);
+                    const toolName = toolMatch ? toolMatch[1] : 'tool';
+
+                    updateFlowStep(3, 'completed');
+
+                    setTimeout(function () {
+                        updateFlowStep(4, 'active', 'Gemini kararı: "' + toolName + '" tool\'unu çağır');
+                    }, STEP_DELAY);
+
+                    setTimeout(function () {
+                        updateFlowStep(4, 'completed');
+                        updateFlowStep(5, 'active', 'POST /mcp/jsonrpc → {"method": "tools/call", "params": {"name": "' + toolName + '"}}');
+                    }, STEP_DELAY * 2);
+
+                    animStep = 6;
+
+                } else if (data.type === 'TOOL_RESULT') {
+                    updateFlowStep(5, 'completed');
+
+                    // Steps 7-11: CAMARA flow with detailed descriptions
+                    setTimeout(function () {
+                        updateFlowStep(6, 'active', 'GET /camara/qod/status veya POST /camara/qod/set-bandwidth');
+                    }, STEP_DELAY);
+
+                    setTimeout(function () {
+                        updateFlowStep(6, 'completed');
+                        updateFlowStep(7, 'active', 'Telco ağında bandwidth/QoS değişikliği yapılıyor...');
+                    }, STEP_DELAY * 2);
+
+                    setTimeout(function () {
+                        updateFlowStep(7, 'completed');
+                        updateFlowStep(8, 'active', 'Ağ durumu güncellendi');
+                    }, STEP_DELAY * 3);
+
+                    setTimeout(function () {
+                        updateFlowStep(8, 'completed');
+                        updateFlowStep(9, 'active', 'CAMARA yanıtı: ' + data.description.substring(0, 80) + '...');
+                    }, STEP_DELAY * 4);
+
+                    setTimeout(function () {
+                        updateFlowStep(9, 'completed');
+                        updateFlowStep(10, 'active', 'Tool sonucu Agent\'a iletiliyor');
+                    }, STEP_DELAY * 5);
+
+                    animStep = 11;
+
+                } else if (data.type === 'FINAL_RESPONSE') {
+                    updateFlowStep(10, 'completed');
+
+                    setTimeout(function () {
+                        updateFlowStep(11, 'active', 'Tool sonucu + soru → Gemini\'e final yanıt için gönderildi');
+                    }, STEP_DELAY);
+
+                    setTimeout(function () {
+                        updateFlowStep(11, 'completed');
+                        updateFlowStep(12, 'active', 'Kullanıcıya doğal dilde yanıt hazırlandı');
+                    }, STEP_DELAY * 2);
+
+                    setTimeout(function () {
+                        updateFlowStep(12, 'completed');
+                    }, STEP_DELAY * 3);
+                }
+            });
+
+            eventSource.addEventListener('result', function (e) {
+                const data = JSON.parse(e.data);
+                document.getElementById('responseBox').textContent = data.response;
+                addLog('Result', 'İşlem tamamlandı. Success: ' + data.success);
+
+                // All steps completed
+                for (let i = 0; i < 13; i++) {
+                    updateFlowStep(i, 'completed');
+                }
+
+                // Update all nodes to completed
+                ['user', 'agent', 'mcp', 'camara', 'network'].forEach(n => {
+                    setNodeStatus(n, 'running');
+                });
+
+                finishRun();
+                refreshQodStatus();
+            });
+
+            eventSource.addEventListener('error', function (e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    addLog('Error', data.message);
+                } catch {
+                    addLog('Error', 'Bağlantı hatası');
+                }
+            });
+
+            eventSource.onerror = function () {
+                addLog('Error', 'SSE bağlantısı kesildi');
+                finishRun();
+            };
+        }
+
+        // Finish run
+        function finishRun() {
+            isRunning = false;
+            const btn = document.getElementById('runBtn');
+            btn.disabled = false;
+            btn.textContent = '▶ Run Agent';
+
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+
+        // Refresh QoD status
+        async function refreshQodStatus() {
+            try {
+                const response = await fetch('/camara/qod/status');
+                const data = await response.json();
+                document.getElementById('currentBandwidth').textContent = data.currentBandwidthMbps;
+            } catch (error) {
+                console.error('QoD status error:', error);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function () {
+            resetFlow();
+            refreshQodStatus();
+            addLog('System', 'UI initialized, backend connection active');
+
+            // Check backend
+            fetch('/mcp/agent/health')
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('connectionStatus').textContent = '● Backend Connected';
+                    addLog('System', 'Backend health OK: ' + d.agent);
+                })
+                .catch(e => {
+                    document.getElementById('connectionStatus').textContent = '○ Disconnected';
+                    document.getElementById('connectionStatus').classList.remove('connected');
+                    addLog('Error', 'Backend bağlantısı yok');
+                });
+        });
+    </script>
+</body>
+
+</html>\n===== FILE: ./src/main/resources/application.yml =====\n
+server:
+  port: 8080
+
+# ==================== GEMINI LLM CONFIGURATION ====================
+# API key .env dosyasından okunur (GEMINI_API_KEY). Asla burada saklamayın.
+# Önce: cp env.example .env  →  .env içine GEMINI_API_KEY yaz  →  ./run.sh
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-2.5-flash}
+
+# ==================== CAMARA API CONFIGURATION ====================
+# When these values are set, the application uses REAL CAMARA API.
+# When empty/not set, the application falls back to MOCK mode.
+#
+# To enable REAL mode, set these via:
+# 1. Environment variables (recommended):
+#    export CAMARA_API_BASE_URL="https://api.operator.com/qod/v1"
+#    export CAMARA_TOKEN_URL="https://auth.operator.com/oauth/token"
+#    export CAMARA_CLIENT_ID="your-client-id"
+#    export CAMARA_CLIENT_SECRET="your-client-secret"
+#    export CAMARA_DEFAULT_PHONE="+905551234567"
+#
+# 2. Or directly in this file (not recommended for secrets)
+
+camara:
+  api:
+    # CAMARA QoD API Base URL
+    # Example: https://api.turkcell.com/qod/v1
+    # Leave empty for MOCK mode
+    base-url: ${CAMARA_API_BASE_URL:}
+
+    # OAuth 2.0 Token Endpoint
+    # Example: https://auth.turkcell.com/oauth/token
+    token-url: ${CAMARA_TOKEN_URL:}
+
+    # OAuth 2.0 Client Credentials
+    client-id: ${CAMARA_CLIENT_ID:}
+    client-secret: ${CAMARA_CLIENT_SECRET:}
+
+    # OAuth Scope (adjust based on operator requirements)
+    scope: ${CAMARA_SCOPE:qod:sessions:create qod:sessions:read qod:sessions:delete}
+
+    # Default phone number for QoS sessions (E.164 format)
+    # Example: +905551234567
+    default-phone: ${CAMARA_DEFAULT_PHONE:}
+
+    # Default session duration in seconds
+    default-duration: ${CAMARA_DEFAULT_DURATION:3600}
+
+  # Mock CAMARA API configuration (for local development/testing)
+  mock:
+    # Base URL for mock CAMARA endpoints
+    # Change this when running mock service separately
+    base-url: ${CAMARA_MOCK_BASE_URL:http://localhost:8080}
+
+# ==================== LOGGING ====================
+logging:
+  level:
+    com.example.mcppoc: DEBUG
+    com.example.mcppoc.client: INFO
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/mock/QodState.java =====\n
+package com.example.mcppoc.camara.mock;
+
+import org.springframework.stereotype.Component;
+
+/**
+ * QoD (Quality on Demand) State - In-memory bandwidth state
+ * 
+ * LAYER: NETWORK INFRASTRUCTURE (Mock)
+ *
+ * This simulates the network state that can be modified by LLM actions.
+ * In a real scenario, this would be the actual network configuration
+ * managed by the telco operator's 5G/LTE core network.
+ */
+@Component
+public class QodState {
+
+    private int currentBandwidthMbps = 500;  // Default starting value
+    private static final int MIN_BANDWIDTH = 100;
+    private static final int MAX_BANDWIDTH = 1000;
+
+    public synchronized int getBandwidth() {
+        return currentBandwidthMbps;
+    }
+
+    public synchronized int setBandwidth(int mbps) {
+        int oldValue = currentBandwidthMbps;
+        // Clamp to valid range
+        currentBandwidthMbps = Math.max(MIN_BANDWIDTH, Math.min(MAX_BANDWIDTH, mbps));
+        return oldValue;
+    }
+
+    public int getMinBandwidth() {
+        return MIN_BANDWIDTH;
+    }
+
+    public int getMaxBandwidth() {
+        return MAX_BANDWIDTH;
+    }
+
+    public void reset() {
+        currentBandwidthMbps = 500;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/mock/CamaraMockController.java =====\n
+package com.example.mcppoc.camara.mock;
+
+import com.example.mcppoc.common.model.CamaraLocationResponse;
+import com.example.mcppoc.camara.mock.QodState;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+/**
+ * Mock CAMARA API - Simulates telco network API
+ * 
+ * LAYER: CAMARA API (Mock Implementation)
+ * 
+ * In real scenario, this would be actual CAMARA API from network provider.
+ *
+ * Includes:
+ * - Device Location API (for reasoning mode)
+ * - QoD (Quality on Demand) API (for action mode)
+ */
+@RestController
+@RequestMapping("/camara")
+public class CamaraMockController {
+
+    private final QodState qodState;
+
+    public CamaraMockController(QodState qodState) {
+        this.qodState = qodState;
+    }
+
+    // ==================== DEVICE LOCATION API ====================
+
+    @GetMapping("/device-location")
+    public CamaraLocationResponse getDeviceLocation(
+            @RequestParam(required = false, defaultValue = "+34612345678") String msisdn) {
+
+        // Mock response - simulating Barcelona roaming scenario
+        CamaraLocationResponse response = new CamaraLocationResponse();
+        response.setCountry("Spain");
+        response.setCity("Barcelona");
+        response.setRoaming(true);
+        response.setVerified(true);
+
+        return response;
+    }
+
+    // ==================== QoD (Quality on Demand) API ====================
+
+    /**
+     * Get current QoD status - bandwidth information
+     */
+    @GetMapping("/qod/status")
+    public Map<String, Object> getQodStatus() {
+        return Map.of(
+                "currentBandwidthMbps", qodState.getBandwidth(),
+                "maxAvailableMbps", qodState.getMaxBandwidth(),
+                "minAvailableMbps", qodState.getMinBandwidth(),
+                "unit", "Mbps");
+    }
+
+    /**
+     * Set new bandwidth - QoD action endpoint
+     */
+    @PostMapping("/qod/set-bandwidth")
+    public Map<String, Object> setBandwidth(@RequestBody Map<String, Integer> request) {
+        int requestedBandwidth = request.getOrDefault("bandwidthMbps", qodState.getBandwidth());
+        int oldBandwidth = qodState.setBandwidth(requestedBandwidth);
+
+        return Map.of(
+                "success", true,
+                "previousBandwidthMbps", oldBandwidth,
+                "newBandwidthMbps", qodState.getBandwidth(),
+                "message", "Bandwidth updated successfully");
+    }
+
+    /**
+     * Reset QoD state to default
+     */
+    @PostMapping("/qod/reset")
+    public Map<String, Object> resetQod() {
+        int oldBandwidth = qodState.getBandwidth();
+        qodState.reset();
+
+        return Map.of(
+                "success", true,
+                "previousBandwidthMbps", oldBandwidth,
+                "newBandwidthMbps", qodState.getBandwidth(),
+                "message", "QoD state reset to default");
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/adapter/CamaraAdapter.java =====\n
+package com.example.mcppoc.camara.adapter;
+
+import com.example.mcppoc.camara.client.CamaraApiClient;
+import com.example.mcppoc.common.model.CamaraLocationResponse;
+import com.example.mcppoc.camara.mock.QodState;
+import com.example.mcppoc.camara.model.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * MCP Server Service - Adaptation layer between CAMARA APIs and MCP protocol
+ * 
+ * LAYER: MCP SERVER
+ *
+ * As per CAMARA paper: "MCP server acts as a translator: it takes a CAMARA API
+ * and translates it into a format that AI systems can understand and use."
+ *
+ * Supports two modes:
+ * 1. REAL MODE: Uses actual CAMARA QoD API (when configured)
+ * 2. MOCK MODE: Uses local mock endpoints (fallback)
+ *
+ * Provides MCP tools:
+ * - get_network_context: Device location for reasoning mode
+ * - get_qod_context: QoD status for action mode
+ * - create_qos_session: Create QoS session (CAMARA)
+ * - end_qos_session: Delete QoS session (CAMARA)
+ * - extend_qos_session: Extend session duration (CAMARA)
+ */
+@Service
+public class CamaraAdapter {
+
+    private static final Logger log = LoggerFactory.getLogger(CamaraAdapter.class);
+
+    private final RestTemplate restTemplate;
+    private final QodState qodState;
+    private final CamaraApiClient camaraClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Configuration
+    @Value("${camara.api.default-phone:}")
+    private String defaultPhoneNumber;
+
+    @Value("${camara.api.default-duration:3600}")
+    private int defaultDuration;
+
+    // Mock CAMARA base URL - configurable for microservice deployment
+    @Value("${camara.mock.base-url:http://localhost:8080}")
+    private String mockCamaraBaseUrl;
+
+    // Store last call details for proof
+    private String lastEndpointCalled;
+    private String lastRawResponse;
+    private long lastLatencyMs;
+
+    // Current session tracking
+    private String currentSessionId;
+    private SessionInfo currentSession;
+
+    public CamaraAdapter(RestTemplate restTemplate, QodState qodState, CamaraApiClient camaraClient) {
+        this.restTemplate = restTemplate;
+        this.qodState = qodState;
+        this.camaraClient = camaraClient;
+    }
+
+    // ==================== MODE DETECTION ====================
+
+    /**
+     * Check if real CAMARA API is configured
+     */
+    public boolean isRealCamaraConfigured() {
+        return camaraClient.isConfigured();
+    }
+
+    /**
+     * Get current mode description
+     */
+    public String getModeDescription() {
+        if (isRealCamaraConfigured()) {
+            return "REAL CAMARA API MODE";
+        }
+        return "MOCK MODE (CAMARA API not configured)";
+    }
+
+    // ==================== DEVICE LOCATION TOOL ====================
+
+    /**
+     * Calls CAMARA device-location API and transforms response to LLM-friendly
+     * format
+     * This is the core MCP tool abstraction for reasoning mode
+     */
+    public String getNetworkContext(String msisdn) {
+        String url = mockCamaraBaseUrl + "/camara/device-location?msisdn=" + msisdn;
+        this.lastEndpointCalled = url;
+
+        long start = System.currentTimeMillis();
+        CamaraLocationResponse response = restTemplate.getForObject(url, CamaraLocationResponse.class);
+        this.lastLatencyMs = System.currentTimeMillis() - start;
+
+        if (response == null) {
+            this.lastRawResponse = "null";
+            return "Network context unavailable";
+        }
+
+        // Store raw JSON for proof
+        try {
+            this.lastRawResponse = objectMapper.writeValueAsString(response);
+        } catch (JsonProcessingException e) {
+            this.lastRawResponse = response.toString();
+        }
+
+        // Transform to LLM-friendly text format
+        return String.format(
+                "Network Context from CAMARA API:\n" +
+                        "- User Location: %s, %s\n" +
+                        "- Roaming Status: %s\n" +
+                        "- Location Verified: %s",
+                response.getCity(),
+                response.getCountry(),
+                response.isRoaming() ? "Yes (international roaming)" : "No (home network)",
+                response.isVerified() ? "Yes (network verified)" : "No");
+    }
+
+    /**
+     * Simple version without msisdn parameter
+     */
+    public String getNetworkContext() {
+        return getNetworkContext("+34612345678");
+    }
+
+    // ==================== QoD CONTEXT (LLM-FRIENDLY) ====================
+
+    /**
+     * Get QoD context for LLM - session-based status in LLM-friendly format
+     * Works in both REAL and MOCK mode
+     */
+    public String getQodContext() {
+        if (isRealCamaraConfigured()) {
+            return getQodContextReal();
+        }
+        return getQodContextMock();
+    }
+
+    /**
+     * REAL MODE: Get QoD context from current CAMARA session
+     */
+    private String getQodContextReal() {
+        StringBuilder context = new StringBuilder();
+        context.append("QoD (Quality on Demand) Status - CAMARA API:\n");
+        context.append("Mode: REAL CAMARA API\n\n");
+
+        // Check if we have an active session
+        if (currentSessionId != null) {
+            try {
+                currentSession = camaraClient.getSession(currentSessionId);
+                this.lastEndpointCalled = camaraClient.getLastEndpointCalled();
+                this.lastLatencyMs = camaraClient.getLastLatencyMs();
+                this.lastRawResponse = camaraClient.getLastRawResponse();
+
+                context.append("ACTIVE SESSION:\n");
+                context.append(String.format("- Session ID: %s\n", currentSession.getSessionId()));
+                context.append(String.format("- QoS Profile: %s\n", currentSession.getQosProfile()));
+                context.append(String.format("- Status: %s\n", currentSession.getQosStatus()));
+                context.append(String.format("- Duration: %d seconds\n", currentSession.getDuration()));
+
+                if (currentSession.getStartedAt() != null) {
+                    context.append(String.format("- Started At: %s\n", currentSession.getStartedAt()));
+                }
+                if (currentSession.getExpiresAt() != null) {
+                    context.append(String.format("- Expires At: %s\n", currentSession.getExpiresAt()));
+                    context.append(String.format("- Remaining: %d seconds\n", currentSession.getRemainingSeconds()));
+                }
+
+                // If session is unavailable, clear it
+                if (currentSession.getQosStatus() == QosStatus.UNAVAILABLE) {
+                    context.append(String.format("- End Reason: %s\n", currentSession.getStatusInfo()));
+                    currentSessionId = null;
+                    currentSession = null;
+                }
+
+            } catch (Exception e) {
+                log.warn("Failed to get session status: {}", e.getMessage());
+                currentSessionId = null;
+                currentSession = null;
+                context.append("- Active Session: None (previous session may have expired)\n");
+            }
+        } else {
+            context.append("- Active Session: None\n");
+        }
+
+        context.append("\nAVAILABLE QoS PROFILES:\n");
+        context.append(QosProfile.getAllProfilesDescription());
+
+        return context.toString();
+    }
+
+    /**
+     * MOCK MODE: Get QoD context from local mock state
+     */
+    @SuppressWarnings("unchecked")
+    private String getQodContextMock() {
+        String url = mockCamaraBaseUrl + "/camara/qod/status";
+        this.lastEndpointCalled = url;
+
+        long start = System.currentTimeMillis();
+        Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+        this.lastLatencyMs = System.currentTimeMillis() - start;
+
+        if (response == null) {
+            this.lastRawResponse = "null";
+            return "QoD context unavailable";
+        }
+
+        try {
+            this.lastRawResponse = objectMapper.writeValueAsString(response);
+        } catch (JsonProcessingException e) {
+            this.lastRawResponse = response.toString();
+        }
+
+        StringBuilder context = new StringBuilder();
+        context.append("QoD (Quality on Demand) Status - MOCK MODE:\n");
+        context.append("Mode: MOCK (CAMARA API not configured)\n\n");
+        context.append(String.format("- Current Bandwidth: %d Mbps\n", response.get("currentBandwidthMbps")));
+        context.append(String.format("- Minimum Available: %d Mbps\n", response.get("minAvailableMbps")));
+        context.append(String.format("- Maximum Available: %d Mbps\n", response.get("maxAvailableMbps")));
+        context.append("\nNote: This is mock data. Configure CAMARA API for real network control.");
+
+        return context.toString();
+    }
+
+    // ==================== QoS SESSION OPERATIONS (REAL CAMARA)
+    // ====================
+
+    /**
+     * Create a QoS session via CAMARA API
+     *
+     * @param qosProfile  Profile name (QOS_S, QOS_M, QOS_L, QOS_E)
+     * @param phoneNumber Device phone number (optional, uses default if null)
+     * @param duration    Session duration in seconds
+     * @return Created session info
+     */
+    public SessionInfo createQosSession(String qosProfile, String phoneNumber, int duration) {
+        if (!isRealCamaraConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured. Cannot create real QoS session.");
+        }
+
+        // Use default phone if not provided
+        String phone = (phoneNumber != null && !phoneNumber.isBlank()) ? phoneNumber : defaultPhoneNumber;
+        if (phone == null || phone.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Phone number is required. Set camara.api.default-phone or provide one.");
+        }
+
+        log.info("Creating QoS session: profile={}, phone={}, duration={}s", qosProfile, phone, duration);
+
+        CreateSessionRequest request = new CreateSessionRequest()
+                .device(Device.withPhoneNumber(phone))
+                .applicationServer(ApplicationServer.allTraffic())
+                .qosProfile(qosProfile)
+                .duration(duration);
+
+        SessionInfo session = camaraClient.createSession(request);
+
+        // Store current session
+        this.currentSessionId = session.getSessionId();
+        this.currentSession = session;
+        this.lastEndpointCalled = camaraClient.getLastEndpointCalled();
+        this.lastLatencyMs = camaraClient.getLastLatencyMs();
+        this.lastRawResponse = camaraClient.getLastRawResponse();
+
+        return session;
+    }
+
+    /**
+     * Create session with defaults
+     */
+    public SessionInfo createQosSession(String qosProfile) {
+        return createQosSession(qosProfile, null, defaultDuration);
+    }
+
+    /**
+     * Wait for session to become AVAILABLE
+     */
+    public SessionInfo waitForSessionAvailable(int maxWaitSeconds) throws InterruptedException {
+        if (currentSessionId == null) {
+            throw new IllegalStateException("No active session to wait for");
+        }
+
+        currentSession = camaraClient.waitForSessionAvailable(currentSessionId, maxWaitSeconds);
+        this.lastEndpointCalled = camaraClient.getLastEndpointCalled();
+        this.lastLatencyMs = camaraClient.getLastLatencyMs();
+        this.lastRawResponse = camaraClient.getLastRawResponse();
+
+        return currentSession;
+    }
+
+    /**
+     * End current QoS session
+     */
+    public void endQosSession() {
+        if (!isRealCamaraConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured");
+        }
+
+        if (currentSessionId == null) {
+            log.warn("No active session to end");
+            return;
+        }
+
+        log.info("Ending QoS session: {}", currentSessionId);
+        camaraClient.deleteSession(currentSessionId);
+
+        this.lastEndpointCalled = camaraClient.getLastEndpointCalled();
+        this.lastLatencyMs = camaraClient.getLastLatencyMs();
+        this.lastRawResponse = camaraClient.getLastRawResponse();
+
+        currentSessionId = null;
+        currentSession = null;
+    }
+
+    /**
+     * Extend current session duration
+     */
+    public SessionInfo extendQosSession(int additionalSeconds) {
+        if (!isRealCamaraConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured");
+        }
+
+        if (currentSessionId == null) {
+            throw new IllegalStateException("No active session to extend");
+        }
+
+        log.info("Extending session {} by {} seconds", currentSessionId, additionalSeconds);
+
+        ExtendSessionRequest request = new ExtendSessionRequest(additionalSeconds);
+        currentSession = camaraClient.extendSession(currentSessionId, request);
+
+        this.lastEndpointCalled = camaraClient.getLastEndpointCalled();
+        this.lastLatencyMs = camaraClient.getLastLatencyMs();
+        this.lastRawResponse = camaraClient.getLastRawResponse();
+
+        return currentSession;
+    }
+
+    /**
+     * Get sessions for a device
+     */
+    public List<SessionInfo> getDeviceSessions(String phoneNumber) {
+        if (!isRealCamaraConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured");
+        }
+
+        RetrieveSessionsRequest request = new RetrieveSessionsRequest(Device.withPhoneNumber(phoneNumber));
+        return camaraClient.retrieveSessions(request);
+    }
+
+    // ==================== MOCK MODE OPERATIONS ====================
+
+    /**
+     * MOCK MODE: Set bandwidth directly (legacy method)
+     * Only works when CAMARA API is not configured
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> setBandwidth(int bandwidthMbps) {
+        if (isRealCamaraConfigured()) {
+            // In real mode, bandwidth changes should go through QoS sessions
+            log.warn("setBandwidth called in REAL mode - use createQosSession instead");
+            throw new IllegalStateException("Use createQosSession for real CAMARA API");
+        }
+
+        String url = mockCamaraBaseUrl + "/camara/qod/set-bandwidth";
+        this.lastEndpointCalled = url;
+
+        long start = System.currentTimeMillis();
+        Map<String, Object> response = restTemplate.postForObject(
+                url,
+                Map.of("bandwidthMbps", bandwidthMbps),
+                Map.class);
+        this.lastLatencyMs = System.currentTimeMillis() - start;
+
+        try {
+            this.lastRawResponse = objectMapper.writeValueAsString(response);
+        } catch (JsonProcessingException e) {
+            this.lastRawResponse = response != null ? response.toString() : "null";
+        }
+
+        return response;
+    }
+
+    // ==================== SESSION STATE GETTERS ====================
+
+    public String getCurrentSessionId() {
+        return currentSessionId;
+    }
+
+    public SessionInfo getCurrentSession() {
+        return currentSession;
+    }
+
+    public boolean hasActiveSession() {
+        return currentSessionId != null && currentSession != null
+                && currentSession.getQosStatus() != QosStatus.UNAVAILABLE;
+    }
+
+    // ==================== PROOF GETTERS ====================
+
+    public String getLastEndpointCalled() {
+        return lastEndpointCalled;
+    }
+
+    public String getLastRawResponse() {
+        return lastRawResponse;
+    }
+
+    public long getLastLatencyMs() {
+        return lastLatencyMs;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/QosProfile.java =====\n
+package com.example.mcppoc.camara.model;
+
+/**
+ * QoS Profile types as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ *
+ * These profiles define different levels of Quality of Service.
+ * The actual meaning and parameters may vary by operator.
+ */
+public enum QosProfile {
+
+    QOS_S("QOS_S", "Standard", "Basic QoS with minimal priority"),
+    QOS_M("QOS_M", "Medium", "Medium priority with reduced latency"),
+    QOS_L("QOS_L", "Large/High", "High priority with low latency guarantee"),
+    QOS_E("QOS_E", "Extreme", "Maximum priority with best latency and throughput");
+
+    private final String code;
+    private final String displayName;
+    private final String description;
+
+    QosProfile(String code, String displayName, String description) {
+        this.code = code;
+        this.displayName = displayName;
+        this.description = description;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public static QosProfile fromCode(String code) {
+        if (code == null) return null;
+
+        for (QosProfile profile : values()) {
+            if (profile.code.equalsIgnoreCase(code) || profile.name().equalsIgnoreCase(code)) {
+                return profile;
+            }
+        }
+        return null;
+    }
+
+    public static String getAllProfilesDescription() {
+        StringBuilder sb = new StringBuilder();
+        for (QosProfile profile : values()) {
+            sb.append(String.format("  - %s: %s\n", profile.code, profile.description));
+        }
+        return sb.toString();
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/StatusInfo.java =====\n
+package com.example.mcppoc.camara.model;
+
+/**
+ * Status information for UNAVAILABLE sessions as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+public enum StatusInfo {
+    DURATION_EXPIRED,
+    NETWORK_TERMINATED,
+    DELETE_REQUESTED
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/QosStatus.java =====\n
+package com.example.mcppoc.camara.model;
+
+/**
+ * QoS Session Status as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+public enum QosStatus {
+    REQUESTED,
+    AVAILABLE,
+    UNAVAILABLE
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/CreateSessionRequest.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+/**
+ * Request body for creating a QoS session as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class CreateSessionRequest {
+
+    private Device device;
+    private ApplicationServer applicationServer;
+    private PortsSpec devicePorts;
+    private PortsSpec applicationServerPorts;
+    private String qosProfile;
+    private String sink;
+    private SinkCredential sinkCredential;
+    private Integer duration;
+
+    public CreateSessionRequest() {
+    }
+
+    public CreateSessionRequest device(Device device) {
+        this.device = device;
+        return this;
+    }
+
+    public CreateSessionRequest applicationServer(ApplicationServer applicationServer) {
+        this.applicationServer = applicationServer;
+        return this;
+    }
+
+    public CreateSessionRequest qosProfile(String qosProfile) {
+        this.qosProfile = qosProfile;
+        return this;
+    }
+
+    public CreateSessionRequest qosProfile(QosProfile profile) {
+        this.qosProfile = profile.getCode();
+        return this;
+    }
+
+    public CreateSessionRequest duration(Integer duration) {
+        this.duration = duration;
+        return this;
+    }
+
+    public CreateSessionRequest sink(String sink) {
+        this.sink = sink;
+        return this;
+    }
+
+    public CreateSessionRequest sinkCredential(SinkCredential sinkCredential) {
+        this.sinkCredential = sinkCredential;
+        return this;
+    }
+
+    public Device getDevice() {
+        return device;
+    }
+
+    public void setDevice(Device device) {
+        this.device = device;
+    }
+
+    public ApplicationServer getApplicationServer() {
+        return applicationServer;
+    }
+
+    public void setApplicationServer(ApplicationServer applicationServer) {
+        this.applicationServer = applicationServer;
+    }
+
+    public PortsSpec getDevicePorts() {
+        return devicePorts;
+    }
+
+    public void setDevicePorts(PortsSpec devicePorts) {
+        this.devicePorts = devicePorts;
+    }
+
+    public PortsSpec getApplicationServerPorts() {
+        return applicationServerPorts;
+    }
+
+    public void setApplicationServerPorts(PortsSpec applicationServerPorts) {
+        this.applicationServerPorts = applicationServerPorts;
+    }
+
+    public String getQosProfile() {
+        return qosProfile;
+    }
+
+    public void setQosProfile(String qosProfile) {
+        this.qosProfile = qosProfile;
+    }
+
+    public String getSink() {
+        return sink;
+    }
+
+    public void setSink(String sink) {
+        this.sink = sink;
+    }
+
+    public SinkCredential getSinkCredential() {
+        return sinkCredential;
+    }
+
+    public void setSinkCredential(SinkCredential sinkCredential) {
+        this.sinkCredential = sinkCredential;
+    }
+
+    public Integer getDuration() {
+        return duration;
+    }
+
+    public void setDuration(Integer duration) {
+        this.duration = duration;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/ExtendSessionRequest.java =====\n
+package com.example.mcppoc.camara.model;
+
+/**
+ * Request body for extending a QoS session as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+public class ExtendSessionRequest {
+
+    private Integer requestedAdditionalDuration;
+
+    public ExtendSessionRequest() {
+    }
+
+    public ExtendSessionRequest(Integer requestedAdditionalDuration) {
+        this.requestedAdditionalDuration = requestedAdditionalDuration;
+    }
+
+    public Integer getRequestedAdditionalDuration() {
+        return requestedAdditionalDuration;
+    }
+
+    public void setRequestedAdditionalDuration(Integer requestedAdditionalDuration) {
+        this.requestedAdditionalDuration = requestedAdditionalDuration;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/RetrieveSessionsRequest.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+/**
+ * Request body for retrieving sessions by device as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class RetrieveSessionsRequest {
+
+    private Device device;
+
+    public RetrieveSessionsRequest() {
+    }
+
+    public RetrieveSessionsRequest(Device device) {
+        this.device = device;
+    }
+
+    public Device getDevice() {
+        return device;
+    }
+
+    public void setDevice(Device device) {
+        this.device = device;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/PortsSpec.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.util.List;
+
+/**
+ * Port specification as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class PortsSpec {
+
+    private List<Integer> ports;
+    private List<PortRange> ranges;
+
+    public PortsSpec() {
+    }
+
+    public static PortsSpec withPorts(List<Integer> ports) {
+        PortsSpec spec = new PortsSpec();
+        spec.setPorts(ports);
+        return spec;
+    }
+
+    public static PortsSpec withRange(int from, int to) {
+        PortsSpec spec = new PortsSpec();
+        spec.setRanges(List.of(new PortRange(from, to)));
+        return spec;
+    }
+
+    public List<Integer> getPorts() {
+        return ports;
+    }
+
+    public void setPorts(List<Integer> ports) {
+        this.ports = ports;
+    }
+
+    public List<PortRange> getRanges() {
+        return ranges;
+    }
+
+    public void setRanges(List<PortRange> ranges) {
+        this.ranges = ranges;
+    }
+
+    public static class PortRange {
+        private Integer from;
+        private Integer to;
+
+        public PortRange() {
+        }
+
+        public PortRange(Integer from, Integer to) {
+            this.from = from;
+            this.to = to;
+        }
+
+        public Integer getFrom() {
+            return from;
+        }
+
+        public void setFrom(Integer from) {
+            this.from = from;
+        }
+
+        public Integer getTo() {
+            return to;
+        }
+
+        public void setTo(Integer to) {
+            this.to = to;
+        }
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/ApplicationServer.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+/**
+ * Application Server model as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class ApplicationServer {
+
+    private String ipv4Address;
+    private String ipv6Address;
+
+    public ApplicationServer() {
+    }
+
+    public ApplicationServer(String ipv4Address) {
+        this.ipv4Address = ipv4Address;
+    }
+
+    public static ApplicationServer withIpv4(String ipv4Address) {
+        ApplicationServer server = new ApplicationServer();
+        server.setIpv4Address(ipv4Address);
+        return server;
+    }
+
+    public static ApplicationServer allTraffic() {
+        return new ApplicationServer("0.0.0.0/0");
+    }
+
+    public String getIpv4Address() {
+        return ipv4Address;
+    }
+
+    public void setIpv4Address(String ipv4Address) {
+        this.ipv4Address = ipv4Address;
+    }
+
+    public String getIpv6Address() {
+        return ipv6Address;
+    }
+
+    public void setIpv6Address(String ipv6Address) {
+        this.ipv6Address = ipv6Address;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/Device.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+/**
+ * Device model as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class Device {
+
+    private String phoneNumber;
+    private Ipv4Address ipv4Address;
+    private String ipv6Address;
+    private String networkAccessIdentifier;
+
+    public Device() {
+    }
+
+    public Device(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public static Device withPhoneNumber(String phoneNumber) {
+        Device device = new Device();
+        device.setPhoneNumber(phoneNumber);
+        return device;
+    }
+
+    public static Device withIpv4(String ipAddress) {
+        Device device = new Device();
+        device.setIpv4Address(new Ipv4Address(ipAddress));
+        return device;
+    }
+
+    public static Device withIpv4(String ipAddress, int port) {
+        Device device = new Device();
+        device.setIpv4Address(new Ipv4Address(ipAddress, port));
+        return device;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public Ipv4Address getIpv4Address() {
+        return ipv4Address;
+    }
+
+    public void setIpv4Address(Ipv4Address ipv4Address) {
+        this.ipv4Address = ipv4Address;
+    }
+
+    public String getIpv6Address() {
+        return ipv6Address;
+    }
+
+    public void setIpv6Address(String ipv6Address) {
+        this.ipv6Address = ipv6Address;
+    }
+
+    public String getNetworkAccessIdentifier() {
+        return networkAccessIdentifier;
+    }
+
+    public void setNetworkAccessIdentifier(String networkAccessIdentifier) {
+        this.networkAccessIdentifier = networkAccessIdentifier;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/TokenResponse.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * OAuth 2.0 Token Response
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+public class TokenResponse {
+
+    @JsonProperty("access_token")
+    private String accessToken;
+
+    @JsonProperty("token_type")
+    private String tokenType;
+
+    @JsonProperty("expires_in")
+    private Integer expiresIn;
+
+    private String scope;
+
+    @JsonProperty("refresh_token")
+    private String refreshToken;
+
+    public TokenResponse() {
+    }
+
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getTokenType() {
+        return tokenType;
+    }
+
+    public void setTokenType(String tokenType) {
+        this.tokenType = tokenType;
+    }
+
+    public Integer getExpiresIn() {
+        return expiresIn;
+    }
+
+    public void setExpiresIn(Integer expiresIn) {
+        this.expiresIn = expiresIn;
+    }
+
+    public String getScope() {
+        return scope;
+    }
+
+    public void setScope(String scope) {
+        this.scope = scope;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/Ipv4Address.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+/**
+ * IPv4 Address model as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class Ipv4Address {
+
+    private String publicAddress;
+    private String privateAddress;
+    private Integer publicPort;
+
+    public Ipv4Address() {
+    }
+
+    public Ipv4Address(String publicAddress) {
+        this.publicAddress = publicAddress;
+    }
+
+    public Ipv4Address(String publicAddress, Integer publicPort) {
+        this.publicAddress = publicAddress;
+        this.publicPort = publicPort;
+    }
+
+    public String getPublicAddress() {
+        return publicAddress;
+    }
+
+    public void setPublicAddress(String publicAddress) {
+        this.publicAddress = publicAddress;
+    }
+
+    public String getPrivateAddress() {
+        return privateAddress;
+    }
+
+    public void setPrivateAddress(String privateAddress) {
+        this.privateAddress = privateAddress;
+    }
+
+    public Integer getPublicPort() {
+        return publicPort;
+    }
+
+    public void setPublicPort(Integer publicPort) {
+        this.publicPort = publicPort;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/SinkCredential.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+/**
+ * Sink Credential for callback authentication as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class SinkCredential {
+
+    private String credentialType;
+    private String accessToken;
+    private String accessTokenExpiresUtc;
+    private String accessTokenType;
+
+    public SinkCredential() {
+    }
+
+    public static SinkCredential plain() {
+        SinkCredential cred = new SinkCredential();
+        cred.setCredentialType("PLAIN");
+        return cred;
+    }
+
+    public static SinkCredential withAccessToken(String accessToken) {
+        SinkCredential cred = new SinkCredential();
+        cred.setCredentialType("ACCESSTOKEN");
+        cred.setAccessToken(accessToken);
+        cred.setAccessTokenType("Bearer");
+        return cred;
+    }
+
+    public String getCredentialType() {
+        return credentialType;
+    }
+
+    public void setCredentialType(String credentialType) {
+        this.credentialType = credentialType;
+    }
+
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getAccessTokenExpiresUtc() {
+        return accessTokenExpiresUtc;
+    }
+
+    public void setAccessTokenExpiresUtc(String accessTokenExpiresUtc) {
+        this.accessTokenExpiresUtc = accessTokenExpiresUtc;
+    }
+
+    public String getAccessTokenType() {
+        return accessTokenType;
+    }
+
+    public void setAccessTokenType(String accessTokenType) {
+        this.accessTokenType = accessTokenType;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/model/SessionInfo.java =====\n
+package com.example.mcppoc.camara.model;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.time.Instant;
+
+/**
+ * QoS Session information as per CAMARA QoD API v1.1.0
+ * 
+ * LAYER: CAMARA API (Model)
+ *
+ * Response body for:
+ * - POST /sessions (201 Created)
+ * - GET /sessions/{sessionId}
+ * - POST /sessions/{sessionId}/extend
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class SessionInfo {
+
+    private String sessionId;
+    private Device device;
+    private ApplicationServer applicationServer;
+    private PortsSpec devicePorts;
+    private PortsSpec applicationServerPorts;
+    private String qosProfile;
+    private QosStatus qosStatus;
+    private StatusInfo statusInfo;
+    private Integer duration;
+    private Instant startedAt;
+    private Instant expiresAt;
+    private String sink;
+
+    public SessionInfo() {
+    }
+
+    // Helper methods
+
+    public boolean isActive() {
+        return qosStatus == QosStatus.AVAILABLE;
+    }
+
+    public boolean isPending() {
+        return qosStatus == QosStatus.REQUESTED;
+    }
+
+    public boolean isEnded() {
+        return qosStatus == QosStatus.UNAVAILABLE;
+    }
+
+    public long getRemainingSeconds() {
+        if (expiresAt == null) return 0;
+        long remaining = expiresAt.getEpochSecond() - Instant.now().getEpochSecond();
+        return Math.max(0, remaining);
+    }
+
+    // Getters and Setters
+
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
+    }
+
+    public Device getDevice() {
+        return device;
+    }
+
+    public void setDevice(Device device) {
+        this.device = device;
+    }
+
+    public ApplicationServer getApplicationServer() {
+        return applicationServer;
+    }
+
+    public void setApplicationServer(ApplicationServer applicationServer) {
+        this.applicationServer = applicationServer;
+    }
+
+    public PortsSpec getDevicePorts() {
+        return devicePorts;
+    }
+
+    public void setDevicePorts(PortsSpec devicePorts) {
+        this.devicePorts = devicePorts;
+    }
+
+    public PortsSpec getApplicationServerPorts() {
+        return applicationServerPorts;
+    }
+
+    public void setApplicationServerPorts(PortsSpec applicationServerPorts) {
+        this.applicationServerPorts = applicationServerPorts;
+    }
+
+    public String getQosProfile() {
+        return qosProfile;
+    }
+
+    public void setQosProfile(String qosProfile) {
+        this.qosProfile = qosProfile;
+    }
+
+    public QosStatus getQosStatus() {
+        return qosStatus;
+    }
+
+    public void setQosStatus(QosStatus qosStatus) {
+        this.qosStatus = qosStatus;
+    }
+
+    public StatusInfo getStatusInfo() {
+        return statusInfo;
+    }
+
+    public void setStatusInfo(StatusInfo statusInfo) {
+        this.statusInfo = statusInfo;
+    }
+
+    public Integer getDuration() {
+        return duration;
+    }
+
+    public void setDuration(Integer duration) {
+        this.duration = duration;
+    }
+
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+
+    public void setStartedAt(Instant startedAt) {
+        this.startedAt = startedAt;
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(Instant expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
+    public String getSink() {
+        return sink;
+    }
+
+    public void setSink(String sink) {
+        this.sink = sink;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("SessionInfo{sessionId='%s', qosProfile='%s', qosStatus=%s, duration=%d}",
+            sessionId, qosProfile, qosStatus, duration);
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/camara/client/CamaraApiClient.java =====\n
+package com.example.mcppoc.camara.client;
+
+import com.example.mcppoc.camara.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * CAMARA QoD API Client
+ * 
+ * LAYER: CAMARA API
+ *
+ * Implements the CAMARA Quality on Demand API v1.1.0 specification.
+ * Handles OAuth 2.0 authentication and all QoS session operations.
+ *
+ * Configuration required in application.yml:
+ * - camara.api.base-url
+ * - camara.api.token-url
+ * - camara.api.client-id
+ * - camara.api.client-secret
+ *
+ * @see https://github.com/camaraproject/QualityOnDemand
+ */
+@Component
+public class CamaraApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(CamaraApiClient.class);
+
+    private final RestTemplate restTemplate;
+
+    // ==================== CONFIGURATION ====================
+    // These values should be set in application.yml or environment variables
+
+    @Value("${camara.api.base-url:}")
+    private String baseUrl;
+
+    @Value("${camara.api.token-url:}")
+    private String tokenUrl;
+
+    @Value("${camara.api.client-id:}")
+    private String clientId;
+
+    @Value("${camara.api.client-secret:}")
+    private String clientSecret;
+
+    @Value("${camara.api.scope:qod:sessions:create qod:sessions:read qod:sessions:delete}")
+    private String scope;
+
+    // Token caching
+    private String cachedToken;
+    private long tokenExpiry;
+
+    // Metrics
+    private long lastLatencyMs;
+    private String lastEndpointCalled;
+    private String lastRawResponse;
+
+    public CamaraApiClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    // ==================== CONFIGURATION CHECK ====================
+
+    /**
+     * Check if CAMARA API is properly configured
+     */
+    public boolean isConfigured() {
+        return baseUrl != null && !baseUrl.isBlank()
+            && tokenUrl != null && !tokenUrl.isBlank()
+            && clientId != null && !clientId.isBlank()
+            && clientSecret != null && !clientSecret.isBlank();
+    }
+
+    /**
+     * Get configuration status for debugging
+     */
+    public String getConfigurationStatus() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("CAMARA API Configuration:\n");
+        sb.append("- Base URL: ").append(isSet(baseUrl) ? baseUrl : "NOT SET").append("\n");
+        sb.append("- Token URL: ").append(isSet(tokenUrl) ? tokenUrl : "NOT SET").append("\n");
+        sb.append("- Client ID: ").append(isSet(clientId) ? "SET (hidden)" : "NOT SET").append("\n");
+        sb.append("- Client Secret: ").append(isSet(clientSecret) ? "SET (hidden)" : "NOT SET").append("\n");
+        sb.append("- Configured: ").append(isConfigured() ? "YES" : "NO");
+        return sb.toString();
+    }
+
+    private boolean isSet(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    // ==================== OAUTH 2.0 AUTHENTICATION ====================
+
+    /**
+     * Get OAuth 2.0 access token using Client Credentials flow
+     * Caches token and refreshes when expired
+     */
+    private String getAccessToken() {
+        // Return cached token if still valid (with 60s buffer)
+        if (cachedToken != null && System.currentTimeMillis() < tokenExpiry - 60000) {
+            return cachedToken;
+        }
+
+        if (!isConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured. Please set camara.api.* properties.");
+        }
+
+        log.info("Requesting new OAuth token from: {}", tokenUrl);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth(clientId, clientSecret);
+
+        String body = "grant_type=client_credentials&scope=" + scope;
+
+        HttpEntity<String> request = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<TokenResponse> response = restTemplate.postForEntity(
+                tokenUrl, request, TokenResponse.class);
+
+            TokenResponse token = response.getBody();
+            if (token == null || token.getAccessToken() == null) {
+                throw new RuntimeException("Empty token response from OAuth server");
+            }
+
+            cachedToken = token.getAccessToken();
+            // Default to 1 hour if expires_in not provided
+            int expiresIn = token.getExpiresIn() != null ? token.getExpiresIn() : 3600;
+            tokenExpiry = System.currentTimeMillis() + (expiresIn * 1000L);
+
+            log.info("OAuth token obtained successfully, expires in {} seconds", expiresIn);
+            return cachedToken;
+
+        } catch (HttpClientErrorException e) {
+            log.error("OAuth token request failed: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Failed to obtain OAuth token: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Create HTTP headers with OAuth bearer token
+     */
+    private HttpHeaders createHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(getAccessToken());
+        // x-correlator for request tracing
+        headers.set("x-correlator", UUID.randomUUID().toString());
+        return headers;
+    }
+
+    // ==================== QoS SESSION OPERATIONS ====================
+
+    /**
+     * POST /sessions - Create a new QoS session
+     *
+     * @param request Session creation parameters
+     * @return Created session info
+     */
+    public SessionInfo createSession(CreateSessionRequest request) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured");
+        }
+
+        String url = baseUrl + "/sessions";
+        this.lastEndpointCalled = url;
+
+        log.info("Creating QoS session: profile={}, duration={}s",
+            request.getQosProfile(), request.getDuration());
+
+        HttpEntity<CreateSessionRequest> entity = new HttpEntity<>(request, createHeaders());
+
+        long start = System.currentTimeMillis();
+        try {
+            ResponseEntity<SessionInfo> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                entity,
+                SessionInfo.class
+            );
+
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            SessionInfo session = response.getBody();
+            this.lastRawResponse = session != null ? session.toString() : "null";
+
+            log.info("Session created: id={}, status={}, latency={}ms",
+                session != null ? session.getSessionId() : "null",
+                session != null ? session.getQosStatus() : "null",
+                lastLatencyMs);
+
+            return session;
+
+        } catch (HttpClientErrorException e) {
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            this.lastRawResponse = e.getResponseBodyAsString();
+            log.error("Create session failed: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Failed to create QoS session: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * GET /sessions/{sessionId} - Get session information
+     *
+     * @param sessionId Session UUID
+     * @return Session info
+     */
+    public SessionInfo getSession(String sessionId) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured");
+        }
+
+        String url = baseUrl + "/sessions/" + sessionId;
+        this.lastEndpointCalled = url;
+
+        HttpEntity<?> entity = new HttpEntity<>(createHeaders());
+
+        long start = System.currentTimeMillis();
+        try {
+            ResponseEntity<SessionInfo> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                entity,
+                SessionInfo.class
+            );
+
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            SessionInfo session = response.getBody();
+            this.lastRawResponse = session != null ? session.toString() : "null";
+
+            return session;
+
+        } catch (HttpClientErrorException e) {
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            this.lastRawResponse = e.getResponseBodyAsString();
+            log.error("Get session failed: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Failed to get QoS session: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * DELETE /sessions/{sessionId} - Delete a session
+     *
+     * @param sessionId Session UUID
+     */
+    public void deleteSession(String sessionId) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured");
+        }
+
+        String url = baseUrl + "/sessions/" + sessionId;
+        this.lastEndpointCalled = url;
+
+        log.info("Deleting QoS session: {}", sessionId);
+
+        HttpEntity<?> entity = new HttpEntity<>(createHeaders());
+
+        long start = System.currentTimeMillis();
+        try {
+            restTemplate.exchange(
+                url,
+                HttpMethod.DELETE,
+                entity,
+                Void.class
+            );
+
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            this.lastRawResponse = "204 No Content";
+
+            log.info("Session deleted successfully: {}, latency={}ms", sessionId, lastLatencyMs);
+
+        } catch (HttpClientErrorException e) {
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            this.lastRawResponse = e.getResponseBodyAsString();
+            log.error("Delete session failed: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Failed to delete QoS session: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * POST /sessions/{sessionId}/extend - Extend session duration
+     *
+     * @param sessionId Session UUID
+     * @param request Extension parameters
+     * @return Updated session info
+     */
+    public SessionInfo extendSession(String sessionId, ExtendSessionRequest request) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured");
+        }
+
+        String url = baseUrl + "/sessions/" + sessionId + "/extend";
+        this.lastEndpointCalled = url;
+
+        log.info("Extending session {} by {} seconds", sessionId, request.getRequestedAdditionalDuration());
+
+        HttpEntity<ExtendSessionRequest> entity = new HttpEntity<>(request, createHeaders());
+
+        long start = System.currentTimeMillis();
+        try {
+            ResponseEntity<SessionInfo> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                entity,
+                SessionInfo.class
+            );
+
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            SessionInfo session = response.getBody();
+            this.lastRawResponse = session != null ? session.toString() : "null";
+
+            log.info("Session extended: {}, new expiry={}", sessionId,
+                session != null ? session.getExpiresAt() : "null");
+
+            return session;
+
+        } catch (HttpClientErrorException e) {
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            this.lastRawResponse = e.getResponseBodyAsString();
+            log.error("Extend session failed: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Failed to extend QoS session: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * POST /retrieve-sessions - Get sessions for a device
+     *
+     * @param request Device identifier
+     * @return List of sessions
+     */
+    @SuppressWarnings("unchecked")
+    public List<SessionInfo> retrieveSessions(RetrieveSessionsRequest request) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("CAMARA API is not configured");
+        }
+
+        String url = baseUrl + "/retrieve-sessions";
+        this.lastEndpointCalled = url;
+
+        HttpEntity<RetrieveSessionsRequest> entity = new HttpEntity<>(request, createHeaders());
+
+        long start = System.currentTimeMillis();
+        try {
+            ResponseEntity<SessionInfo[]> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                entity,
+                SessionInfo[].class
+            );
+
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            SessionInfo[] sessions = response.getBody();
+            this.lastRawResponse = sessions != null ? "Found " + sessions.length + " sessions" : "null";
+
+            return sessions != null ? List.of(sessions) : List.of();
+
+        } catch (HttpClientErrorException e) {
+            this.lastLatencyMs = System.currentTimeMillis() - start;
+            this.lastRawResponse = e.getResponseBodyAsString();
+            log.error("Retrieve sessions failed: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Failed to retrieve sessions: " + e.getMessage(), e);
+        }
+    }
+
+    // ==================== POLLING HELPER ====================
+
+    /**
+     * Wait for session to become AVAILABLE (polling)
+     *
+     * @param sessionId Session to wait for
+     * @param maxWaitSeconds Maximum time to wait
+     * @param pollIntervalSeconds Time between polls
+     * @return Session when AVAILABLE
+     * @throws InterruptedException if interrupted
+     * @throws RuntimeException if session becomes UNAVAILABLE or timeout
+     */
+    public SessionInfo waitForSessionAvailable(String sessionId, int maxWaitSeconds, int pollIntervalSeconds)
+            throws InterruptedException {
+
+        log.info("Waiting for session {} to become AVAILABLE (max {}s)", sessionId, maxWaitSeconds);
+
+        int waited = 0;
+
+        while (waited < maxWaitSeconds) {
+            SessionInfo session = getSession(sessionId);
+
+            if (session.getQosStatus() == QosStatus.AVAILABLE) {
+                log.info("Session {} is now AVAILABLE after {}s", sessionId, waited);
+                return session;
+            }
+
+            if (session.getQosStatus() == QosStatus.UNAVAILABLE) {
+                log.warn("Session {} became UNAVAILABLE: {}", sessionId, session.getStatusInfo());
+                throw new RuntimeException("Session became unavailable: " + session.getStatusInfo());
+            }
+
+            log.debug("Session {} still REQUESTED, waiting... ({}/{}s)", sessionId, waited, maxWaitSeconds);
+            Thread.sleep(pollIntervalSeconds * 1000L);
+            waited += pollIntervalSeconds;
+        }
+
+        throw new RuntimeException("Timeout waiting for session " + sessionId + " to become AVAILABLE");
+    }
+
+    /**
+     * Simplified version with default poll interval (2 seconds)
+     */
+    public SessionInfo waitForSessionAvailable(String sessionId, int maxWaitSeconds)
+            throws InterruptedException {
+        return waitForSessionAvailable(sessionId, maxWaitSeconds, 2);
+    }
+
+    // ==================== METRICS GETTERS ====================
+
+    public long getLastLatencyMs() {
+        return lastLatencyMs;
+    }
+
+    public String getLastEndpointCalled() {
+        return lastEndpointCalled;
+    }
+
+    public String getLastRawResponse() {
+        return lastRawResponse;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/agent/AiAgent.java =====\n
+package com.example.mcppoc.agent;
+
+import com.example.mcppoc.mcp.client.McpClient;
+import com.example.mcppoc.mcp.protocol.Tool;
+import com.example.mcppoc.mcp.protocol.ToolResult;
+import com.example.mcppoc.common.config.AppConfig;
+import com.example.mcppoc.camara.mock.QodState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.*;
+
+/**
+ * AI Agent with Real MCP Protocol
+ * 
+ * This is the main agent that:
+ * 1. Gets tool list from MCP Server (tool discovery)
+ * 2. Sends user query + tools to LLM (with function calling)
+ * 3. If LLM wants to call a tool, calls it via MCP Client
+ * 4. Returns result back to LLM
+ * 5. Repeats until LLM gives final response
+ * 
+ * This implements the ReAct (Reasoning + Acting) pattern.
+ */
+@Service
+public class AiAgent {
+
+    private static final Logger log = LoggerFactory.getLogger(AiAgent.class);
+    private static final int MAX_ITERATIONS = 5;
+
+    private final McpClient mcpClient;
+    private final RestTemplate restTemplate;
+    private final AppConfig appConfig;
+    private final QodState qodState;
+
+    // Execution trace for proof
+    private List<AgentStep> executionTrace = new ArrayList<>();
+
+    public AiAgent(McpClient mcpClient, RestTemplate restTemplate, AppConfig appConfig,
+            QodState qodState) {
+        this.mcpClient = mcpClient;
+        this.restTemplate = restTemplate;
+        this.appConfig = appConfig;
+        this.qodState = qodState;
+    }
+
+    /**
+     * Main agent execution method
+     * 
+     * @param userQuery             User's input query
+     * @param includeStatusInPrompt If true, injects current system state into
+     *                              context
+     * @return Agent response including execution trace
+     */
+    public AgentResponse run(String userQuery, boolean includeStatusInPrompt) {
+        log.info("Agent starting with query: {} (includeStatus={})", userQuery, includeStatusInPrompt);
+        executionTrace = new ArrayList<>();
+
+        try {
+            // Step 1: Get available tools from MCP Server
+            log.info("Step 1: Fetching tools from MCP Server");
+            List<Tool> tools = mcpClient.listTools();
+            executionTrace.add(AgentStep.toolDiscovery(tools.size()));
+
+            // Step 2: Build conversation
+            // NOTE: We don't add system message to 'contents' anymore.
+            // It goes to 'systemInstruction' field.
+            List<Map<String, Object>> messages = new ArrayList<>();
+            Map<String, Object> systemInstruction = buildSystemInstruction(includeStatusInPrompt);
+
+            messages.add(buildUserMessage(userQuery));
+
+            // Trace the constructed prompt (Messages + Tools + System Instruction)
+            executionTrace.add(AgentStep.prompt(messages, tools, systemInstruction));
+
+            // Step 3: Agent loop (ReAct pattern)
+            String finalResponse = null;
+            int iteration = 0;
+
+            while (iteration < MAX_ITERATIONS) {
+                iteration++;
+                log.info("Agent iteration {}", iteration);
+
+                // Call LLM with function calling AND system instruction
+                Map<String, Object> llmResponse = callLlmWithFunctions(messages, tools, systemInstruction);
+
+                // Check if LLM wants to call a function
+                Map<String, Object> functionCall = extractFunctionCall(llmResponse);
+
+                if (functionCall != null) {
+                    // LLM wants to call a tool
+                    String toolName = (String) functionCall.get("name");
+                    Map<String, Object> args = parseArguments(functionCall.get("args"));
+
+                    log.info("LLM wants to call tool: {} with args: {}", toolName, args);
+                    executionTrace.add(AgentStep.llmToolCall(toolName, args));
+
+                    // Call tool via MCP Client
+                    ToolResult toolResult = mcpClient.callTool(toolName, args);
+                    String resultText = getResultText(toolResult);
+
+                    log.info("Tool result: {}", resultText);
+                    executionTrace.add(AgentStep.toolResult(toolName, resultText));
+
+                    // Add assistant message (function call) and function result to messages
+                    messages.add(buildAssistantFunctionCall(toolName, args));
+                    messages.add(buildFunctionResult(toolName, resultText));
+
+                } else {
+                    // LLM gave final response
+                    finalResponse = extractText(llmResponse);
+                    log.info("LLM final response received");
+                    executionTrace.add(AgentStep.finalResponse(finalResponse));
+                    break;
+                }
+            }
+
+            if (finalResponse == null) {
+                finalResponse = "Agent maksimum iterasyon sayısına ulaştı.";
+            }
+
+            return new AgentResponse(finalResponse, executionTrace, true);
+
+        } catch (Exception e) {
+            log.error("Agent execution failed: {}", e.getMessage(), e);
+            executionTrace.add(AgentStep.error(e.getMessage()));
+            return new AgentResponse("Hata: " + e.getMessage(), executionTrace, false);
+        }
+    }
+
+    // Overload for backward compatibility
+    public AgentResponse run(String userQuery) {
+        return run(userQuery, false);
+    }
+
+    /**
+     * Call Gemini API with function calling support
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> callLlmWithFunctions(List<Map<String, Object>> messages, List<Tool> tools,
+            Map<String, Object> systemInstruction) {
+        String url = String.format(
+                "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
+                appConfig.getGeminiModel(),
+                appConfig.getGeminiApiKey());
+
+        // Build request with function declarations
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("contents", messages);
+
+        // Add system instruction (Enterprise Standard)
+        if (systemInstruction != null) {
+            requestBody.put("systemInstruction", systemInstruction);
+        }
+
+        // Add tools as function declarations
+        List<Map<String, Object>> functionDeclarations = tools.stream()
+                .map(this::toolToFunctionDeclaration)
+                .toList();
+
+        requestBody.put("tools", List.of(
+                Map.of("function_declarations", functionDeclarations)));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+
+        return response.getBody();
+    }
+
+    /**
+     * Convert MCP Tool to Gemini function declaration
+     */
+    private Map<String, Object> toolToFunctionDeclaration(Tool tool) {
+        Map<String, Object> fn = new HashMap<>();
+        fn.put("name", tool.getName());
+        fn.put("description", tool.getDescription());
+
+        // Convert inputSchema to Gemini format
+        Map<String, Object> schema = tool.getInputSchema();
+        if (schema != null) {
+            fn.put("parameters", schema);
+        } else {
+            fn.put("parameters", Map.of(
+                    "type", "object",
+                    "properties", Map.of()));
+        }
+
+        return fn;
+    }
+
+    /**
+     * Extract function call from LLM response
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractFunctionCall(Map<String, Object> response) {
+        try {
+            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
+            if (candidates == null || candidates.isEmpty())
+                return null;
+
+            Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
+            List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+
+            for (Map<String, Object> part : parts) {
+                if (part.containsKey("functionCall")) {
+                    return (Map<String, Object>) part.get("functionCall");
+                }
+            }
+
+            return null;
+        } catch (Exception e) {
+            log.warn("Failed to extract function call: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Extract text from LLM response
+     */
+    @SuppressWarnings("unchecked")
+    private String extractText(Map<String, Object> response) {
+        try {
+            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
+            if (candidates == null || candidates.isEmpty())
+                return "Yanıt alınamadı.";
+
+            Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
+            List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+
+            StringBuilder text = new StringBuilder();
+            for (Map<String, Object> part : parts) {
+                if (part.containsKey("text")) {
+                    text.append(part.get("text"));
+                }
+            }
+
+            return text.toString();
+        } catch (Exception e) {
+            log.warn("Failed to extract text: {}", e.getMessage());
+            return "Yanıt işlenemedi.";
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseArguments(Object args) {
+        if (args == null)
+            return Map.of();
+        if (args instanceof Map)
+            return (Map<String, Object>) args;
+        return Map.of();
+    }
+
+    private String getResultText(ToolResult result) {
+        if (result.getContent() == null || result.getContent().isEmpty()) {
+            return "Sonuç alınamadı.";
+        }
+        return result.getContent().get(0).getText();
+    }
+
+    private Map<String, Object> buildSystemInstruction(boolean includeStatus) {
+        StringBuilder prompt = new StringBuilder();
+
+        // 1. Role Definition & Capability
+        prompt.append("Sen bir ağ asistanısın.\n");
+        prompt.append("CAMARA API üzerinden QoS (Quality on Demand) session'larını yönetebilirsin.\n\n");
+
+        // 2. Tool Usage Instructions (Critical for stability)
+        prompt.append("Elindeki yetenekler tools listesinde tanımlıdır.\n");
+        prompt.append("Kullanıcı isteği bir işlem gerektiriyorsa uygun tool’u seç ve functionCall üret.\n");
+        prompt.append("Sadece bilgi gerekiyorsa tool çağırmadan cevapla.\n\n");
+
+        // Security Constraint (Enterprise Safety)
+        prompt.append("ÖNEMLİ: Sadece tools listesinde tanımlı yetenekleri kullanabilirsin.\n");
+        prompt.append("Liste dışı işlem üretme ve varsayım yapma.\n\n");
+
+        prompt.append("Yanıtlarını Türkçe ver.\n");
+
+        // 3. Dynamic Context injection
+        if (includeStatus) {
+            String systemContext = String.format(
+                    "\nMEVCUT SİSTEM DURUMU (Authoritative Context):\n" +
+                            "- Current Bandwidth: %d Mbps\n" +
+                            "- Max Available: %d Mbps\n" +
+                            "- Min Available: %d Mbps\n" +
+                            "- Active QoS Session: %s\n",
+                    qodState.getBandwidth(),
+                    qodState.getMaxBandwidth(),
+                    qodState.getMinBandwidth(),
+                    "None");
+
+            prompt.append(systemContext);
+            log.info("Injected system context into System Instruction");
+        }
+
+        return Map.of("parts", List.of(Map.of("text", prompt.toString())));
+    }
+
+    private Map<String, Object> buildUserMessage(String query) {
+        return Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", query)));
+    }
+
+    private Map<String, Object> buildAssistantFunctionCall(String name, Map<String, Object> args) {
+        return Map.of(
+                "role", "model",
+                "parts", List.of(Map.of(
+                        "functionCall", Map.of(
+                                "name", name,
+                                "args", args))));
+    }
+
+    private Map<String, Object> buildFunctionResult(String name, String result) {
+        return Map.of(
+                "role", "function",
+                "parts", List.of(Map.of(
+                        "functionResponse", Map.of(
+                                "name", name,
+                                "response", Map.of("result", result)))));
+    }
+
+    /**
+     * Agent execution step for tracing
+     */
+    public static class AgentStep {
+        private final String type;
+        private final String description;
+        private final Object data;
+        private final long timestamp;
+
+        public AgentStep(String type, String description, Object data) {
+            this.type = type;
+            this.description = description;
+            this.data = data;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        public static AgentStep toolDiscovery(int toolCount) {
+            return new AgentStep("TOOL_DISCOVERY",
+                    "MCP Server'dan " + toolCount + " tool alındı", toolCount);
+        }
+
+        public static AgentStep llmToolCall(String toolName, Map<String, Object> args) {
+            return new AgentStep("LLM_TOOL_CALL",
+                    "LLM tool çağırmak istiyor: " + toolName,
+                    Map.of("tool", toolName, "args", args));
+        }
+
+        public static AgentStep toolResult(String toolName, String result) {
+            return new AgentStep("TOOL_RESULT",
+                    "Tool sonucu alındı: " + toolName, result);
+        }
+
+        public static AgentStep finalResponse(String response) {
+            return new AgentStep("FINAL_RESPONSE",
+                    "LLM final yanıt verdi", response);
+        }
+
+        public static AgentStep error(String message) {
+            return new AgentStep("ERROR", message, null);
+        }
+
+        public static AgentStep prompt(List<Map<String, Object>> messages, List<Tool> tools,
+                Map<String, Object> systemInstruction) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("messages", messages);
+            data.put("tools", tools);
+            data.put("systemInstruction", systemInstruction); // Include system instruction in trace
+
+            return new AgentStep("PROMPT",
+                    "LLM'e gönderilen prompt (System + Messages + Tools)",
+                    data);
+        }
+
+        // Getters
+        public String getType() {
+            return type;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public Object getData() {
+            return data;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+    }
+
+    /**
+     * Agent response with execution trace
+     */
+    public static class AgentResponse {
+        private final String response;
+        private final List<AgentStep> trace;
+        private final boolean success;
+
+        public AgentResponse(String response, List<AgentStep> trace, boolean success) {
+            this.response = response;
+            this.trace = trace;
+            this.success = success;
+        }
+
+        public String getResponse() {
+            return response;
+        }
+
+        public List<AgentStep> getTrace() {
+            return trace;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/server/ToolExecutor.java =====\n
+package com.example.mcppoc.mcp.server;
+
+import com.example.mcppoc.camara.adapter.CamaraAdapter;
+import com.example.mcppoc.camara.model.SessionInfo;
+import com.example.mcppoc.mcp.protocol.ToolResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.Map;
+
+/**
+ * MCP Tool Executor
+ * 
+ * Executes tools by delegating to appropriate services.
+ * Acts as a bridge between MCP protocol and actual CAMARA operations.
+ */
+@Component
+public class ToolExecutor {
+
+    private static final Logger log = LoggerFactory.getLogger(ToolExecutor.class);
+
+    private final CamaraAdapter camaraAdapter;
+    private final ToolRegistry toolRegistry;
+
+    public ToolExecutor(CamaraAdapter camaraAdapter, ToolRegistry toolRegistry) {
+        this.camaraAdapter = camaraAdapter;
+        this.toolRegistry = toolRegistry;
+    }
+
+    /**
+     * Execute a tool by name with given arguments
+     * 
+     * @param toolName  Name of the tool to execute
+     * @param arguments Tool arguments
+     * @return Tool execution result
+     */
+    public ToolResult execute(String toolName, Map<String, Object> arguments) {
+        log.info("Executing tool: {} with arguments: {}", toolName, arguments);
+
+        if (!toolRegistry.hasTool(toolName)) {
+            log.warn("Tool not found: {}", toolName);
+            return ToolResult.error("Tool not found: " + toolName);
+        }
+
+        try {
+            return switch (toolName) {
+                case "get_network_context" -> executeGetNetworkContext(arguments);
+                case "get_qod_context" -> executeGetQodContext(arguments);
+                case "create_qos_session" -> executeCreateQosSession(arguments);
+                case "end_qos_session" -> executeEndQosSession(arguments);
+                case "extend_qos_session" -> executeExtendQosSession(arguments);
+                case "set_bandwidth" -> executeSetBandwidth(arguments);
+                default -> ToolResult.error("Unknown tool: " + toolName);
+            };
+        } catch (Exception e) {
+            log.error("Tool execution failed: {} - {}", toolName, e.getMessage(), e);
+            return ToolResult.error("Tool execution failed: " + e.getMessage());
+        }
+    }
+
+    private ToolResult executeGetNetworkContext(Map<String, Object> arguments) {
+        String msisdn = getStringArg(arguments, "msisdn", "+34612345678");
+        String result = camaraAdapter.getNetworkContext(msisdn);
+
+        log.info("get_network_context result: {} chars", result.length());
+        return ToolResult.text(result);
+    }
+
+    private ToolResult executeGetQodContext(Map<String, Object> arguments) {
+        String result = camaraAdapter.getQodContext();
+
+        log.info("get_qod_context result: {} chars", result.length());
+        return ToolResult.text(result);
+    }
+
+    private static final java.util.List<String> VALID_PROFILES = java.util.List.of("QOS_S", "QOS_M", "QOS_L", "QOS_E");
+
+    private ToolResult executeCreateQosSession(Map<String, Object> arguments) {
+        String qosProfile = getStringArg(arguments, "qosProfile", "QOS_M");
+        int duration = getIntArg(arguments, "duration", 3600);
+        String phoneNumber = getStringArg(arguments, "phoneNumber", null);
+
+        // Validation - 1. Check Profile
+        if (!VALID_PROFILES.contains(qosProfile)) {
+            return ToolResult.error("Invalid qosProfile: " + qosProfile + ". Valid values: " + VALID_PROFILES);
+        }
+
+        // Validation - 2. Check Duration
+        if (duration <= 0) {
+            return ToolResult.error("Invalid duration: " + duration + ". Must be positive.");
+        }
+
+        if (!camaraAdapter.isRealCamaraConfigured()) {
+            return ToolResult.error("CAMARA API yapılandırılmamış. Gerçek QoS session oluşturulamıyor.");
+        }
+
+        SessionInfo session = camaraAdapter.createQosSession(qosProfile, phoneNumber, duration);
+
+        String result = String.format(
+                "QoS Session oluşturuldu!\n\n" +
+                        "Session ID: %s\n" +
+                        "Profil: %s\n" +
+                        "Durum: %s\n" +
+                        "Süre: %d saniye\n" +
+                        "Başlangıç: %s\n" +
+                        "Bitiş: %s",
+                session.getSessionId(),
+                session.getQosProfile(),
+                session.getQosStatus(),
+                session.getDuration(),
+                session.getStartedAt() != null ? session.getStartedAt() : "Bekleniyor",
+                session.getExpiresAt() != null ? session.getExpiresAt() : "Bekleniyor");
+
+        log.info("create_qos_session: Session created with ID {}", session.getSessionId());
+        return ToolResult.text(result);
+    }
+
+    private ToolResult executeEndQosSession(Map<String, Object> arguments) {
+        if (!camaraAdapter.isRealCamaraConfigured()) {
+            return ToolResult.error("CAMARA API yapılandırılmamış.");
+        }
+
+        if (!camaraAdapter.hasActiveSession()) {
+            return ToolResult.text("Aktif bir QoS session bulunmuyor.");
+        }
+
+        String sessionId = camaraAdapter.getCurrentSessionId();
+        camaraAdapter.endQosSession();
+
+        String result = String.format(
+                "QoS Session sonlandırıldı!\n\n" +
+                        "Session ID: %s\n" +
+                        "Durum: Sonlandırıldı",
+                sessionId);
+
+        log.info("end_qos_session: Session {} ended", sessionId);
+        return ToolResult.text(result);
+    }
+
+    private ToolResult executeExtendQosSession(Map<String, Object> arguments) {
+        if (!camaraAdapter.isRealCamaraConfigured()) {
+            return ToolResult.error("CAMARA API yapılandırılmamış.");
+        }
+
+        if (!camaraAdapter.hasActiveSession()) {
+            return ToolResult.error("Uzatılacak aktif bir QoS session bulunmuyor.");
+        }
+
+        int additionalSeconds = getIntArg(arguments, "additionalSeconds", 1800);
+
+        if (additionalSeconds <= 0) {
+            return ToolResult.error("Invalid additionalSeconds: " + additionalSeconds + ". Must be positive.");
+        }
+
+        SessionInfo session = camaraAdapter.extendQosSession(additionalSeconds);
+
+        String result = String.format(
+                "QoS Session uzatıldı!\n\n" +
+                        "Session ID: %s\n" +
+                        "Eklenen Süre: %d saniye\n" +
+                        "Yeni Süre: %d saniye\n" +
+                        "Yeni Bitiş: %s",
+                session.getSessionId(),
+                additionalSeconds,
+                session.getDuration(),
+                session.getExpiresAt());
+
+        log.info("extend_qos_session: Session {} extended by {} seconds", session.getSessionId(), additionalSeconds);
+        return ToolResult.text(result);
+    }
+
+    private ToolResult executeSetBandwidth(Map<String, Object> arguments) {
+        int bandwidthMbps = getIntArg(arguments, "bandwidthMbps", 500);
+
+        if (bandwidthMbps < 100 || bandwidthMbps > 1000) {
+            return ToolResult.error("Bandwidth must be between 100-1000 Mbps. Requested: " + bandwidthMbps);
+        }
+
+        // Call the CamaraAdapter to set bandwidth (which calls mock CAMARA ->
+        // Network)
+        Map<String, Object> result = camaraAdapter.setBandwidth(bandwidthMbps);
+
+        String response = String.format(
+                "Bandwidth değiştirildi!\\n\\n" +
+                        "Önceki Değer: %d Mbps\\n" +
+                        "Yeni Değer: %d Mbps\\n\\n" +
+                        "Durum: %s",
+                result.get("previousBandwidthMbps"),
+                result.get("newBandwidthMbps"),
+                result.get("message"));
+
+        log.info("set_bandwidth: {} -> {} Mbps", result.get("previousBandwidthMbps"), result.get("newBandwidthMbps"));
+        return ToolResult.text(response);
+    }
+
+    // Helper methods
+    private String getStringArg(Map<String, Object> args, String key, String defaultValue) {
+        if (args == null || !args.containsKey(key)) {
+            return defaultValue;
+        }
+        Object value = args.get(key);
+        return value != null ? value.toString() : defaultValue;
+    }
+
+    private int getIntArg(Map<String, Object> args, String key, int defaultValue) {
+        if (args == null || !args.containsKey(key)) {
+            return defaultValue;
+        }
+        Object value = args.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/server/ToolRegistry.java =====\n
+package com.example.mcppoc.mcp.server;
+
+import com.example.mcppoc.mcp.protocol.Tool;
+import org.springframework.stereotype.Component;
+
+import jakarta.annotation.PostConstruct;
+import java.util.*;
+
+/**
+ * MCP Tool Registry
+ * 
+ * Manages available tools and their definitions.
+ * Tools are registered at startup and can be queried via tools/list.
+ */
+@Component
+public class ToolRegistry {
+
+        private final Map<String, Tool> tools = new LinkedHashMap<>();
+
+        @PostConstruct
+        public void init() {
+                // Register CAMARA tools
+                registerCamaraTools();
+        }
+
+        private void registerCamaraTools() {
+
+                // 1. get_network_context - Device location from CAMARA
+                tools.put("get_network_context", Tool.builder()
+                                .name("get_network_context")
+                                .description("CAMARA API'den cihaz konum ve ağ bilgisini alır. " +
+                                                "Kullanıcının şehir, ülke, roaming durumu ve location doğrulama bilgisini verir.")
+                                .inputSchema(Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(
+                                                                "msisdn", Map.of(
+                                                                                "type", "string",
+                                                                                "description",
+                                                                                "Telefon numarası E.164 formatında (örn: +905551234567)")),
+                                                "required", List.of()))
+                                .build());
+
+                // 2. get_qod_context - QoD session status
+                tools.put("get_qod_context", Tool.builder()
+                                .name("get_qod_context")
+                                .description("Mevcut bandwidth durumunu ve QoS bilgisini gösterir. " +
+                                                "'Bandwidth durumum nedir?', 'Hızım ne kadar?', 'Mevcut Mbps değerim?' gibi sorular için kullanılır. "
+                                                +
+                                                "Aktif session varsa detaylarını, yoksa kullanılabilir profilleri listeler.")
+                                .inputSchema(Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(),
+                                                "required", List.of()))
+                                .build());
+
+                // 3. create_qos_session - Create QoS session via CAMARA
+                tools.put("create_qos_session", Tool.builder()
+                                .name("create_qos_session")
+                                .description("Yeni bir QoS session'ı oluşturur. Kullanıcı hız artırmak, kalite yükseltmek veya gecikmeyi düşürmek istediğinde kullanılır.")
+                                .inputSchema(Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(
+                                                                "qosProfile", Map.of(
+                                                                                "type", "string",
+                                                                                "enum",
+                                                                                List.of("QOS_S", "QOS_M", "QOS_L",
+                                                                                                "QOS_E"),
+                                                                                "description",
+                                                                                "QoS profili: QOS_S=standart, QOS_M=orta, QOS_L=yüksek hız/düşük gecikme, QOS_E=premium"),
+                                                                "duration", Map.of(
+                                                                                "type", "integer",
+                                                                                "description",
+                                                                                "Session süresi saniye cinsinden (örn: 3600 = 1 saat)",
+                                                                                "default", 3600),
+                                                                "phoneNumber", Map.of(
+                                                                                "type", "string",
+                                                                                "description",
+                                                                                "Telefon numarası E.164 formatında (opsiyonel, varsayılan kullanılabilir)")),
+                                                "required", List.of("qosProfile")))
+                                .build());
+
+                // 4. end_qos_session - End current QoS session
+                tools.put("end_qos_session", Tool.builder()
+                                .name("end_qos_session")
+                                .description("Mevcut aktif QoS session'ı sonlandırır. " +
+                                                "Artırılmış hız/kalite devre dışı kalır, normal ağ durumuna dönülür.")
+                                .inputSchema(Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(),
+                                                "required", List.of()))
+                                .build());
+
+                // 5. extend_qos_session - Extend session duration
+                tools.put("extend_qos_session", Tool.builder()
+                                .name("extend_qos_session")
+                                .description("Mevcut aktif QoS session süresini uzatır.")
+                                .inputSchema(Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(
+                                                                "additionalSeconds", Map.of(
+                                                                                "type", "integer",
+                                                                                "description",
+                                                                                "Eklenecek süre saniye cinsinden (örn: 1800 = 30 dakika)")),
+                                                "required", List.of("additionalSeconds")))
+                                .build());
+
+                // 6. set_bandwidth - Direct bandwidth control (MOCK mode only)
+                tools.put("set_bandwidth", Tool.builder()
+                                .name("set_bandwidth")
+                                .description("MOCK MODE: Doğrudan bandwidth değeri ayarlar. " +
+                                                "Kullanıcı '700 Mbps yap' veya 'hızımı 500 yap' gibi komutlar verdiğinde kullanılır. "
+                                                +
+                                                "Değer 100-1000 Mbps aralığında olmalıdır.")
+                                .inputSchema(Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(
+                                                                "bandwidthMbps", Map.of(
+                                                                                "type", "integer",
+                                                                                "description",
+                                                                                "Ayarlanacak bandwidth değeri (Mbps). Örn: 700, 500, 1000",
+                                                                                "minimum", 100,
+                                                                                "maximum", 1000)),
+                                                "required", List.of("bandwidthMbps")))
+                                .build());
+        }
+
+        /**
+         * Get all registered tools
+         */
+        public List<Tool> getAllTools() {
+                return new ArrayList<>(tools.values());
+        }
+
+        /**
+         * Get a specific tool by name
+         */
+        public Optional<Tool> getTool(String name) {
+                return Optional.ofNullable(tools.get(name));
+        }
+
+        /**
+         * Check if a tool exists
+         */
+        public boolean hasTool(String name) {
+                return tools.containsKey(name);
+        }
+
+        /**
+         * Get tool count
+         */
+        public int getToolCount() {
+                return tools.size();
+        }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/server/McpServerController.java =====\n
+package com.example.mcppoc.mcp.server;
+
+import com.example.mcppoc.mcp.protocol.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+/**
+ * MCP Server Controller
+ * 
+ * JSON-RPC 2.0 endpoint for MCP protocol.
+ * Handles: initialize, tools/list, tools/call
+ */
+@RestController
+@RequestMapping("/mcp")
+@CrossOrigin(origins = "*")
+public class McpServerController {
+
+    private static final Logger log = LoggerFactory.getLogger(McpServerController.class);
+
+    private final ToolRegistry toolRegistry;
+    private final ToolExecutor toolExecutor;
+    private final ObjectMapper objectMapper;
+
+    // Server info
+    private static final String SERVER_NAME = "camara-mcp-server";
+    private static final String SERVER_VERSION = "1.0.0";
+    private static final String PROTOCOL_VERSION = "2024-11-05";
+
+    public McpServerController(ToolRegistry toolRegistry, ToolExecutor toolExecutor) {
+        this.toolRegistry = toolRegistry;
+        this.toolExecutor = toolExecutor;
+        this.objectMapper = new ObjectMapper();
+    }
+
+    /**
+     * Main JSON-RPC endpoint
+     */
+    @PostMapping(value = "/jsonrpc", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public McpResponse handleRequest(@RequestBody McpRequest request) {
+        log.info("MCP Request: method={}, id={}", request.getMethod(), request.getId());
+
+        try {
+            return switch (request.getMethod()) {
+                case "initialize" -> handleInitialize(request);
+                case "tools/list" -> handleToolsList(request);
+                case "tools/call" -> handleToolsCall(request);
+                default -> McpResponse.methodNotFound(request.getId());
+            };
+        } catch (Exception e) {
+            log.error("Error handling MCP request: {}", e.getMessage(), e);
+            return McpResponse.internalError(request.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Handle initialize request
+     */
+    private McpResponse handleInitialize(McpRequest request) {
+        log.info("Initialize request received");
+
+        Map<String, Object> result = Map.of(
+                "protocolVersion", PROTOCOL_VERSION,
+                "capabilities", Map.of(
+                        "tools", Map.of()),
+                "serverInfo", Map.of(
+                        "name", SERVER_NAME,
+                        "version", SERVER_VERSION));
+
+        return McpResponse.success(request.getId(), result);
+    }
+
+    /**
+     * Handle tools/list request
+     */
+    private McpResponse handleToolsList(McpRequest request) {
+        log.info("tools/list request - returning {} tools", toolRegistry.getToolCount());
+
+        ToolsListResult result = new ToolsListResult(toolRegistry.getAllTools());
+        return McpResponse.success(request.getId(), result);
+    }
+
+    /**
+     * Handle tools/call request
+     */
+    @SuppressWarnings("unchecked")
+    private McpResponse handleToolsCall(McpRequest request) {
+        // Parse params
+        ToolCallParams params;
+        try {
+            if (request.getParams() instanceof ToolCallParams) {
+                params = (ToolCallParams) request.getParams();
+            } else if (request.getParams() instanceof Map) {
+                Map<String, Object> paramsMap = (Map<String, Object>) request.getParams();
+                params = new ToolCallParams(
+                        (String) paramsMap.get("name"),
+                        (Map<String, Object>) paramsMap.get("arguments"));
+            } else {
+                return McpResponse.error(request.getId(),
+                        McpError.INVALID_PARAMS, "Invalid params format");
+            }
+        } catch (Exception e) {
+            return McpResponse.error(request.getId(),
+                    McpError.INVALID_PARAMS, "Failed to parse params: " + e.getMessage());
+        }
+
+        if (params.getName() == null || params.getName().isBlank()) {
+            return McpResponse.error(request.getId(),
+                    McpError.INVALID_PARAMS, "Tool name is required");
+        }
+
+        log.info("tools/call: {} with args: {}", params.getName(), params.getArguments());
+
+        // Execute tool
+        ToolResult result = toolExecutor.execute(params.getName(), params.getArguments());
+
+        return McpResponse.success(request.getId(), result);
+    }
+
+    /**
+     * Health check endpoint
+     */
+    @GetMapping("/health")
+    public Map<String, Object> health() {
+        return Map.of(
+                "status", "ok",
+                "server", SERVER_NAME,
+                "version", SERVER_VERSION,
+                "protocol", PROTOCOL_VERSION,
+                "toolCount", toolRegistry.getToolCount());
+    }
+
+    /**
+     * Simple tools list endpoint (non JSON-RPC, for testing)
+     */
+    @GetMapping("/tools")
+    public ToolsListResult listToolsSimple() {
+        return new ToolsListResult(toolRegistry.getAllTools());
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/protocol/ToolResult.java =====\n
+package com.example.mcppoc.mcp.protocol;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+
+/**
+ * MCP Tool Result
+ * 
+ * Result of a tool execution. Contains content array with text or other types.
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class ToolResult {
+
+    @JsonProperty("content")
+    private List<Content> content;
+
+    @JsonProperty("isError")
+    private Boolean isError;
+
+    public ToolResult() {
+    }
+
+    public ToolResult(List<Content> content) {
+        this.content = content;
+    }
+
+    public ToolResult(List<Content> content, boolean isError) {
+        this.content = content;
+        this.isError = isError;
+    }
+
+    // Factory methods
+    public static ToolResult text(String text) {
+        return new ToolResult(List.of(Content.text(text)));
+    }
+
+    public static ToolResult error(String errorMessage) {
+        return new ToolResult(List.of(Content.text(errorMessage)), true);
+    }
+
+    // Getters and Setters
+    public List<Content> getContent() {
+        return content;
+    }
+
+    public void setContent(List<Content> content) {
+        this.content = content;
+    }
+
+    public Boolean getIsError() {
+        return isError;
+    }
+
+    public void setIsError(Boolean isError) {
+        this.isError = isError;
+    }
+
+    /**
+     * Content item in tool result
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class Content {
+
+        @JsonProperty("type")
+        private String type;
+
+        @JsonProperty("text")
+        private String text;
+
+        public Content() {
+        }
+
+        public Content(String type, String text) {
+            this.type = type;
+            this.text = text;
+        }
+
+        public static Content text(String text) {
+            return new Content("text", text);
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public String getText() {
+            return text;
+        }
+
+        public void setText(String text) {
+            this.text = text;
+        }
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/protocol/InitializeParams.java =====\n
+package com.example.mcppoc.mcp.protocol;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * Parameters for initialize method
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class InitializeParams {
+
+    @JsonProperty("protocolVersion")
+    private String protocolVersion = "2025-11-25";
+
+    @JsonProperty("capabilities")
+    private Capabilities capabilities;
+
+    @JsonProperty("clientInfo")
+    private ClientInfo clientInfo;
+
+    public InitializeParams() {
+    }
+
+    public String getProtocolVersion() {
+        return protocolVersion;
+    }
+
+    public void setProtocolVersion(String protocolVersion) {
+        this.protocolVersion = protocolVersion;
+    }
+
+    public Capabilities getCapabilities() {
+        return capabilities;
+    }
+
+    public void setCapabilities(Capabilities capabilities) {
+        this.capabilities = capabilities;
+    }
+
+    public ClientInfo getClientInfo() {
+        return clientInfo;
+    }
+
+    public void setClientInfo(ClientInfo clientInfo) {
+        this.clientInfo = clientInfo;
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class Capabilities {
+        // Client capabilities - can be extended
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ClientInfo {
+        @JsonProperty("name")
+        private String name;
+
+        @JsonProperty("version")
+        private String version;
+
+        public ClientInfo() {
+        }
+
+        public ClientInfo(String name, String version) {
+            this.name = name;
+            this.version = version;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getVersion() {
+            return version;
+        }
+
+        public void setVersion(String version) {
+            this.version = version;
+        }
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/protocol/McpRequest.java =====\n
+package com.example.mcppoc.mcp.protocol;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * MCP JSON-RPC 2.0 Request
+ * 
+ * Standard JSON-RPC request format used in MCP protocol.
+ * Supports methods: initialize, tools/list, tools/call, resources/list,
+ * resources/read
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class McpRequest {
+
+    @JsonProperty("jsonrpc")
+    private String jsonrpc = "2.0";
+
+    @JsonProperty("id")
+    private Object id;
+
+    @JsonProperty("method")
+    private String method;
+
+    @JsonProperty("params")
+    private Object params;
+
+    public McpRequest() {
+    }
+
+    public McpRequest(Object id, String method, Object params) {
+        this.id = id;
+        this.method = method;
+        this.params = params;
+    }
+
+    // Static factory methods
+    public static McpRequest toolsList(Object id) {
+        return new McpRequest(id, "tools/list", null);
+    }
+
+    public static McpRequest toolsCall(Object id, ToolCallParams params) {
+        return new McpRequest(id, "tools/call", params);
+    }
+
+    public static McpRequest initialize(Object id, InitializeParams params) {
+        return new McpRequest(id, "initialize", params);
+    }
+
+    // Getters and Setters
+    public String getJsonrpc() {
+        return jsonrpc;
+    }
+
+    public void setJsonrpc(String jsonrpc) {
+        this.jsonrpc = jsonrpc;
+    }
+
+    public Object getId() {
+        return id;
+    }
+
+    public void setId(Object id) {
+        this.id = id;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
+    }
+
+    public Object getParams() {
+        return params;
+    }
+
+    public void setParams(Object params) {
+        this.params = params;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/protocol/ToolCallParams.java =====\n
+package com.example.mcppoc.mcp.protocol;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
+
+/**
+ * Parameters for tools/call method
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class ToolCallParams {
+
+    @JsonProperty("name")
+    private String name;
+
+    @JsonProperty("arguments")
+    private Map<String, Object> arguments;
+
+    public ToolCallParams() {
+    }
+
+    public ToolCallParams(String name, Map<String, Object> arguments) {
+        this.name = name;
+        this.arguments = arguments;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Map<String, Object> getArguments() {
+        return arguments;
+    }
+
+    public void setArguments(Map<String, Object> arguments) {
+        this.arguments = arguments;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/protocol/Tool.java =====\n
+package com.example.mcppoc.mcp.protocol;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
+
+/**
+ * MCP Tool Definition
+ * 
+ * Represents a tool that can be called via MCP protocol.
+ * Contains name, description, and JSON Schema for input validation.
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class Tool {
+
+    @JsonProperty("name")
+    private String name;
+
+    @JsonProperty("description")
+    private String description;
+
+    @JsonProperty("inputSchema")
+    private Map<String, Object> inputSchema;
+
+    public Tool() {
+    }
+
+    public Tool(String name, String description, Map<String, Object> inputSchema) {
+        this.name = name;
+        this.description = description;
+        this.inputSchema = inputSchema;
+    }
+
+    // Builder pattern for cleaner construction
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private String name;
+        private String description;
+        private Map<String, Object> inputSchema;
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder description(String description) {
+            this.description = description;
+            return this;
+        }
+
+        public Builder inputSchema(Map<String, Object> inputSchema) {
+            this.inputSchema = inputSchema;
+            return this;
+        }
+
+        public Tool build() {
+            return new Tool(name, description, inputSchema);
+        }
+    }
+
+    // Getters and Setters
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public Map<String, Object> getInputSchema() {
+        return inputSchema;
+    }
+
+    public void setInputSchema(Map<String, Object> inputSchema) {
+        this.inputSchema = inputSchema;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/protocol/ToolsListResult.java =====\n
+package com.example.mcppoc.mcp.protocol;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+
+/**
+ * Result of tools/list method
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class ToolsListResult {
+
+    @JsonProperty("tools")
+    private List<Tool> tools;
+
+    public ToolsListResult() {
+    }
+
+    public ToolsListResult(List<Tool> tools) {
+        this.tools = tools;
+    }
+
+    public List<Tool> getTools() {
+        return tools;
+    }
+
+    public void setTools(List<Tool> tools) {
+        this.tools = tools;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/protocol/McpResponse.java =====\n
+package com.example.mcppoc.mcp.protocol;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * MCP JSON-RPC 2.0 Response
+ * 
+ * Standard JSON-RPC response format used in MCP protocol.
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class McpResponse {
+
+    @JsonProperty("jsonrpc")
+    private String jsonrpc = "2.0";
+
+    @JsonProperty("id")
+    private Object id;
+
+    @JsonProperty("result")
+    private Object result;
+
+    @JsonProperty("error")
+    private McpError error;
+
+    public McpResponse() {
+    }
+
+    public McpResponse(Object id, Object result) {
+        this.id = id;
+        this.result = result;
+    }
+
+    public McpResponse(Object id, McpError error) {
+        this.id = id;
+        this.error = error;
+    }
+
+    // Static factory methods
+    public static McpResponse success(Object id, Object result) {
+        return new McpResponse(id, result);
+    }
+
+    public static McpResponse error(Object id, int code, String message) {
+        return new McpResponse(id, new McpError(code, message));
+    }
+
+    public static McpResponse methodNotFound(Object id) {
+        return error(id, -32601, "Method not found");
+    }
+
+    public static McpResponse invalidRequest(Object id) {
+        return error(id, -32600, "Invalid Request");
+    }
+
+    public static McpResponse parseError() {
+        return error(null, -32700, "Parse error");
+    }
+
+    public static McpResponse internalError(Object id, String message) {
+        return error(id, -32603, "Internal error: " + message);
+    }
+
+    public boolean isSuccess() {
+        return error == null;
+    }
+
+    public boolean isError() {
+        return error != null;
+    }
+
+    // Getters and Setters
+    public String getJsonrpc() {
+        return jsonrpc;
+    }
+
+    public void setJsonrpc(String jsonrpc) {
+        this.jsonrpc = jsonrpc;
+    }
+
+    public Object getId() {
+        return id;
+    }
+
+    public void setId(Object id) {
+        this.id = id;
+    }
+
+    public Object getResult() {
+        return result;
+    }
+
+    public void setResult(Object result) {
+        this.result = result;
+    }
+
+    public McpError getError() {
+        return error;
+    }
+
+    public void setError(McpError error) {
+        this.error = error;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/protocol/McpError.java =====\n
+package com.example.mcppoc.mcp.protocol;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * MCP JSON-RPC 2.0 Error
+ * 
+ * Standard error codes:
+ * -32700: Parse error
+ * -32600: Invalid Request
+ * -32601: Method not found
+ * -32602: Invalid params
+ * -32603: Internal error
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class McpError {
+
+    // Standard JSON-RPC error codes
+    public static final int PARSE_ERROR = -32700;
+    public static final int INVALID_REQUEST = -32600;
+    public static final int METHOD_NOT_FOUND = -32601;
+    public static final int INVALID_PARAMS = -32602;
+    public static final int INTERNAL_ERROR = -32603;
+
+    @JsonProperty("code")
+    private int code;
+
+    @JsonProperty("message")
+    private String message;
+
+    @JsonProperty("data")
+    private Object data;
+
+    public McpError() {
+    }
+
+    public McpError(int code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    public McpError(int code, String message, Object data) {
+        this.code = code;
+        this.message = message;
+        this.data = data;
+    }
+
+    // Getters and Setters
+    public int getCode() {
+        return code;
+    }
+
+    public void setCode(int code) {
+        this.code = code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public Object getData() {
+        return data;
+    }
+
+    public void setData(Object data) {
+        this.data = data;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/mcp/client/McpClient.java =====\n
+package com.example.mcppoc.mcp.client;
+
+import com.example.mcppoc.mcp.protocol.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * MCP Client
+ * 
+ * Communicates with MCP Server via JSON-RPC 2.0 protocol.
+ * Provides methods for tool discovery and tool calling.
+ */
+@Component
+public class McpClient {
+
+    private static final Logger log = LoggerFactory.getLogger(McpClient.class);
+
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    @Value("${mcp.server.url:http://localhost:8080/mcp/jsonrpc}")
+    private String mcpServerUrl;
+
+    // Request ID counter
+    private int requestId = 0;
+
+    // Cached tools
+    private List<Tool> cachedTools;
+
+    public McpClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+        this.objectMapper = new ObjectMapper();
+    }
+
+    /**
+     * Initialize connection with MCP Server
+     */
+    public Map<String, Object> initialize() {
+        log.info("Initializing MCP connection to: {}", mcpServerUrl);
+
+        InitializeParams params = new InitializeParams();
+        params.setClientInfo(new InitializeParams.ClientInfo("camara-ai-agent", "1.0.0"));
+
+        McpRequest request = McpRequest.initialize(nextId(), params);
+        McpResponse response = sendRequest(request);
+
+        if (response.isError()) {
+            throw new RuntimeException("Initialize failed: " + response.getError().getMessage());
+        }
+
+        log.info("MCP initialized successfully");
+        return (Map<String, Object>) response.getResult();
+    }
+
+    /**
+     * Get list of available tools from MCP Server
+     * This is the key method for tool discovery!
+     */
+    @SuppressWarnings("unchecked")
+    public List<Tool> listTools() {
+        log.info("Requesting tools list from MCP Server");
+
+        McpRequest request = McpRequest.toolsList(nextId());
+        McpResponse response = sendRequest(request);
+
+        if (response.isError()) {
+            throw new RuntimeException("tools/list failed: " + response.getError().getMessage());
+        }
+
+        // Parse result
+        Map<String, Object> result = (Map<String, Object>) response.getResult();
+        List<Map<String, Object>> toolMaps = (List<Map<String, Object>>) result.get("tools");
+
+        List<Tool> tools = toolMaps.stream()
+                .map(this::mapToTool)
+                .toList();
+
+        this.cachedTools = tools;
+        log.info("Received {} tools from MCP Server", tools.size());
+
+        return tools;
+    }
+
+    /**
+     * Call a tool on MCP Server
+     * 
+     * @param toolName  Name of the tool to call
+     * @param arguments Tool arguments
+     * @return Tool result
+     */
+    @SuppressWarnings("unchecked")
+    public ToolResult callTool(String toolName, Map<String, Object> arguments) {
+        log.info("Calling tool: {} with arguments: {}", toolName, arguments);
+
+        ToolCallParams params = new ToolCallParams(toolName, arguments);
+        McpRequest request = McpRequest.toolsCall(nextId(), params);
+
+        McpResponse response = sendRequest(request);
+
+        if (response.isError()) {
+            log.error("Tool call failed: {}", response.getError().getMessage());
+            return ToolResult.error(response.getError().getMessage());
+        }
+
+        // Parse result
+        Map<String, Object> result = (Map<String, Object>) response.getResult();
+        return mapToToolResult(result);
+    }
+
+    /**
+     * Get cached tools (call listTools first)
+     */
+    public List<Tool> getCachedTools() {
+        if (cachedTools == null) {
+            return listTools();
+        }
+        return cachedTools;
+    }
+
+    /**
+     * Clear tool cache
+     */
+    public void clearCache() {
+        this.cachedTools = null;
+    }
+
+    // ==================== PRIVATE METHODS ====================
+
+    private McpResponse sendRequest(McpRequest request) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<McpRequest> entity = new HttpEntity<>(request, headers);
+
+        try {
+            ResponseEntity<McpResponse> response = restTemplate.exchange(
+                    mcpServerUrl,
+                    HttpMethod.POST,
+                    entity,
+                    McpResponse.class);
+
+            return response.getBody();
+
+        } catch (Exception e) {
+            log.error("MCP request failed: {}", e.getMessage());
+            throw new RuntimeException("MCP request failed: " + e.getMessage(), e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Tool mapToTool(Map<String, Object> map) {
+        Tool tool = new Tool();
+        tool.setName((String) map.get("name"));
+        tool.setDescription((String) map.get("description"));
+        tool.setInputSchema((Map<String, Object>) map.get("inputSchema"));
+        return tool;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ToolResult mapToToolResult(Map<String, Object> map) {
+        List<Map<String, Object>> contentList = (List<Map<String, Object>>) map.get("content");
+        Boolean isError = (Boolean) map.get("isError");
+
+        List<ToolResult.Content> content = contentList.stream()
+                .map(c -> new ToolResult.Content(
+                        (String) c.get("type"),
+                        (String) c.get("text")))
+                .toList();
+
+        return new ToolResult(content, isError != null && isError);
+    }
+
+    private synchronized int nextId() {
+        return ++requestId;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/common/config/AppConfig.java =====\n
+package com.example.mcppoc.common.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * Application Configuration
+ * 
+ * LAYER: Common (Shared Configuration)
+ */
+@Configuration
+public class AppConfig {
+
+    @Value("${gemini.api-key}")
+    private String geminiApiKey;
+
+    @Value("${gemini.model}")
+    private String geminiModel;
+
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
+
+    public String getGeminiApiKey() {
+        return geminiApiKey;
+    }
+
+    public String getGeminiModel() {
+        return geminiModel;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/common/model/CamaraLocationResponse.java =====\n
+package com.example.mcppoc.common.model;
+
+/**
+ * CAMARA Device Location API Response
+ * 
+ * LAYER: Common (Shared Model)
+ */
+public class CamaraLocationResponse {
+
+    private String country;
+    private String city;
+    private boolean roaming;
+    private boolean verified;
+
+    public CamaraLocationResponse() {
+    }
+
+    public CamaraLocationResponse(String country, String city, boolean roaming, boolean verified) {
+        this.country = country;
+        this.city = city;
+        this.roaming = roaming;
+        this.verified = verified;
+    }
+
+    public String getCountry() {
+        return country;
+    }
+
+    public void setCountry(String country) {
+        this.country = country;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public boolean isRoaming() {
+        return roaming;
+    }
+
+    public void setRoaming(boolean roaming) {
+        this.roaming = roaming;
+    }
+
+    public boolean isVerified() {
+        return verified;
+    }
+
+    public void setVerified(boolean verified) {
+        this.verified = verified;
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/common/model/ExecutionResult.java =====\n
+package com.example.mcppoc.common.model;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Captures all execution details for POC proof/analysis
+ * 
+ * LAYER: Common (Shared Model)
+ * 
+ * This is critical for demonstrating what happens in each mode
+ */
+public class ExecutionResult {
+
+    // Execution metadata
+    private String executionId;
+    private String mode; // SYNC, ASYNC_CLEAN, ASYNC_WITH_CONTEXT
+    private LocalDateTime timestamp;
+
+    // Input
+    private String userQuestion;
+
+    // CAMARA API data
+    private String camaraEndpoint;
+    private String camaraRawResponse;
+    private long camaraLatencyMs;
+
+    // LLM data - THIS IS THE KEY PROOF
+    private String llmPromptSent;        // Exact prompt sent to LLM
+    private String llmRawResponse;       // Raw response from LLM
+    private int promptTokenEstimate;     // Approximate token count
+    private long llmLatencyMs;
+
+    // SSE events sent (for async modes)
+    private List<SseEvent> sseEventsSent = new ArrayList<>();
+
+    // Timing breakdown
+    private long totalExecutionMs;
+    private long networkContextMs;
+    private long llmProcessingMs;
+
+    // Analysis flags
+    private boolean intermediateStatusInPrompt; // true = potential confusion
+    private String analysisNotes;
+
+    // Nested class for SSE events
+    public static class SseEvent {
+        private String eventType;
+        private String message;
+        private long timestampMs;
+        private boolean sentToLlm; // Was this included in LLM prompt?
+
+        public SseEvent(String eventType, String message, long timestampMs, boolean sentToLlm) {
+            this.eventType = eventType;
+            this.message = message;
+            this.timestampMs = timestampMs;
+            this.sentToLlm = sentToLlm;
+        }
+
+        public String getEventType() { return eventType; }
+        public String getMessage() { return message; }
+        public long getTimestampMs() { return timestampMs; }
+        public boolean isSentToLlm() { return sentToLlm; }
+    }
+
+    // Getters and Setters
+    public String getExecutionId() { return executionId; }
+    public void setExecutionId(String executionId) { this.executionId = executionId; }
+
+    public String getMode() { return mode; }
+    public void setMode(String mode) { this.mode = mode; }
+
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    public String getUserQuestion() { return userQuestion; }
+    public void setUserQuestion(String userQuestion) { this.userQuestion = userQuestion; }
+
+    public String getCamaraEndpoint() { return camaraEndpoint; }
+    public void setCamaraEndpoint(String camaraEndpoint) { this.camaraEndpoint = camaraEndpoint; }
+
+    public String getCamaraRawResponse() { return camaraRawResponse; }
+    public void setCamaraRawResponse(String camaraRawResponse) { this.camaraRawResponse = camaraRawResponse; }
+
+    public long getCamaraLatencyMs() { return camaraLatencyMs; }
+    public void setCamaraLatencyMs(long camaraLatencyMs) { this.camaraLatencyMs = camaraLatencyMs; }
+
+    public String getLlmPromptSent() { return llmPromptSent; }
+    public void setLlmPromptSent(String llmPromptSent) { this.llmPromptSent = llmPromptSent; }
+
+    public String getLlmRawResponse() { return llmRawResponse; }
+    public void setLlmRawResponse(String llmRawResponse) { this.llmRawResponse = llmRawResponse; }
+
+    public int getPromptTokenEstimate() { return promptTokenEstimate; }
+    public void setPromptTokenEstimate(int promptTokenEstimate) { this.promptTokenEstimate = promptTokenEstimate; }
+
+    public long getLlmLatencyMs() { return llmLatencyMs; }
+    public void setLlmLatencyMs(long llmLatencyMs) { this.llmLatencyMs = llmLatencyMs; }
+
+    public List<SseEvent> getSseEventsSent() { return sseEventsSent; }
+    public void setSseEventsSent(List<SseEvent> sseEventsSent) { this.sseEventsSent = sseEventsSent; }
+
+    public void addSseEvent(String eventType, String message, long timestampMs, boolean sentToLlm) {
+        this.sseEventsSent.add(new SseEvent(eventType, message, timestampMs, sentToLlm));
+    }
+
+    public long getTotalExecutionMs() { return totalExecutionMs; }
+    public void setTotalExecutionMs(long totalExecutionMs) { this.totalExecutionMs = totalExecutionMs; }
+
+    public long getNetworkContextMs() { return networkContextMs; }
+    public void setNetworkContextMs(long networkContextMs) { this.networkContextMs = networkContextMs; }
+
+    public long getLlmProcessingMs() { return llmProcessingMs; }
+    public void setLlmProcessingMs(long llmProcessingMs) { this.llmProcessingMs = llmProcessingMs; }
+
+    public boolean isIntermediateStatusInPrompt() { return intermediateStatusInPrompt; }
+    public void setIntermediateStatusInPrompt(boolean intermediateStatusInPrompt) { this.intermediateStatusInPrompt = intermediateStatusInPrompt; }
+
+    public String getAnalysisNotes() { return analysisNotes; }
+    public void setAnalysisNotes(String analysisNotes) { this.analysisNotes = analysisNotes; }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/history/ExecutionHistoryService.java =====\n
+package com.example.mcppoc.history;
+
+import com.example.mcppoc.common.model.ExecutionResult;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Stores execution history for comparison and analysis
+ * 
+ * LAYER: History (POC Utility)
+ * 
+ * Critical for POC proof - comparing different modes side by side
+ */
+@Service
+public class ExecutionHistoryService {
+
+    private final List<ExecutionResult> history = new ArrayList<>();
+    private final ConcurrentHashMap<String, ExecutionResult> byId = new ConcurrentHashMap<>();
+
+    public void save(ExecutionResult result) {
+        history.add(result);
+        byId.put(result.getExecutionId(), result);
+
+        // Keep only last 50 executions
+        if (history.size() > 50) {
+            ExecutionResult removed = history.remove(0);
+            byId.remove(removed.getExecutionId());
+        }
+    }
+
+    public List<ExecutionResult> getAll() {
+        return new ArrayList<>(history);
+    }
+
+    public ExecutionResult getById(String id) {
+        return byId.get(id);
+    }
+
+    public List<ExecutionResult> getByMode(String mode) {
+        return history.stream()
+                .filter(r -> r.getMode().equals(mode))
+                .toList();
+    }
+
+    public void clear() {
+        history.clear();
+        byId.clear();
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/api/agent/AgentController.java =====\n
+package com.example.mcppoc.api.agent;
+
+import com.example.mcppoc.agent.AiAgent;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * MCP Agent Controller
+ * 
+ * REST endpoints for the new MCP-based AI Agent.
+ * Uses real MCP protocol with tool discovery and function calling.
+ */
+@RestController
+@RequestMapping("/mcp/agent")
+@CrossOrigin(origins = "*")
+public class AgentController {
+
+    private final AiAgent aiAgent;
+
+    public AgentController(AiAgent aiAgent) {
+        this.aiAgent = aiAgent;
+    }
+
+    /**
+     * Run agent with SSE streaming
+     * 
+     * This endpoint:
+     * 1. Gets tools from MCP Server (tool discovery)
+     * 2. Sends user query + tools to LLM
+     * 3. Executes tool calls via MCP protocol
+     * 4. Returns result with execution trace
+     */
+    @GetMapping(value = "/run", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter runWithStream(@RequestParam String question,
+            @RequestParam(defaultValue = "false") boolean includeStatus) {
+        SseEmitter emitter = new SseEmitter(120000L); // 2 min timeout
+
+        new Thread(() -> {
+            try {
+                // Send start event
+                sendEvent(emitter, "status", Map.of(
+                        "type", "STARTED",
+                        "message", "Agent başlatıldı - MCP tool discovery yapılıyor..."));
+
+                // Run agent
+                AiAgent.AgentResponse response = aiAgent.run(question, includeStatus);
+
+                // Send trace events
+                for (AiAgent.AgentStep step : response.getTrace()) {
+                    Map<String, Object> traceData = new HashMap<>();
+                    traceData.put("type", step.getType());
+                    traceData.put("description", step.getDescription());
+                    traceData.put("timestamp", step.getTimestamp());
+                    if (step.getData() != null) {
+                        traceData.put("data", step.getData());
+                    }
+
+                    sendEvent(emitter, "trace", traceData);
+                    Thread.sleep(100); // Small delay for UI
+                }
+
+                // Send final result
+                sendEvent(emitter, "result", Map.of(
+                        "success", response.isSuccess(),
+                        "response", response.getResponse(),
+                        "traceCount", response.getTrace().size()));
+
+                emitter.complete();
+
+            } catch (Exception e) {
+                try {
+                    sendEvent(emitter, "error", Map.of("message", e.getMessage()));
+                } catch (IOException ignored) {
+                }
+                emitter.completeWithError(e);
+            }
+        }).start();
+
+        return emitter;
+    }
+
+    /**
+     * Run agent (sync mode for simple testing)
+     */
+    @GetMapping("/run-sync")
+    public AiAgent.AgentResponse runSync(@RequestParam String question) {
+        return aiAgent.run(question);
+    }
+
+    /**
+     * Health check
+     */
+    @GetMapping("/health")
+    public Map<String, Object> health() {
+        return Map.of(
+                "status", "ok",
+                "agent", "AiAgent with MCP",
+                "features", "Tool Discovery, Function Calling, ReAct Loop");
+    }
+
+    private void sendEvent(SseEmitter emitter, String name, Object data) throws IOException {
+        emitter.send(SseEmitter.event().name(name).data(data));
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/api/history/HistoryController.java =====\n
+package com.example.mcppoc.api.history;
+
+import com.example.mcppoc.common.model.ExecutionResult;
+import com.example.mcppoc.history.ExecutionHistoryService;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * Legacy Controller - Only history endpoints remain
+ * 
+ * Main agent functionality moved to AgentController (MCP-based)
+ * 
+ * @see com.example.mcppoc.api.agent.AgentController for new MCP endpoints
+ */
+@RestController
+@CrossOrigin(origins = "*")
+public class HistoryController {
+
+    private final ExecutionHistoryService historyService;
+
+    public HistoryController(ExecutionHistoryService historyService) {
+        this.historyService = historyService;
+    }
+
+    /**
+     * Get all execution history
+     */
+    @GetMapping("/history")
+    public List<ExecutionResult> getHistory() {
+        return historyService.getAll();
+    }
+
+    /**
+     * Get execution by ID
+     */
+    @GetMapping("/history/{id}")
+    public ExecutionResult getExecution(@PathVariable String id) {
+        return historyService.getById(id);
+    }
+
+    /**
+     * Get executions by mode for comparison
+     */
+    @GetMapping("/history/mode/{mode}")
+    public List<ExecutionResult> getByMode(@PathVariable String mode) {
+        return historyService.getByMode(mode);
+    }
+
+    /**
+     * Clear history
+     */
+    @DeleteMapping("/history")
+    public String clearHistory() {
+        historyService.clear();
+        return "History cleared";
+    }
+
+    /**
+     * Health check endpoint
+     */
+    @GetMapping("/health")
+    public String health() {
+        return "MCP POC is running! Use /mcp/agent/run for AI agent.";
+    }
+}
+\n===== FILE: ./src/main/java/com/example/mcppoc/application/McpPocApplication.java =====\n
+package com.example.mcppoc.application;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
+
+@SpringBootApplication
+@ComponentScan(basePackages = "com.example.mcppoc")
+public class McpPocApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(McpPocApplication.class, args);
+    }
+}

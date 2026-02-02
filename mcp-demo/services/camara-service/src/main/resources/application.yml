@@ -1,0 +1,35 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: camara-service
+
+# Network Mock Service (for MOCK mode)
+network-mock:
+  base-url: http://localhost:8085
+
+# CAMARA API Configuration (for REAL mode)
+# Set these environment variables or uncomment and fill:
+camara:
+  api:
+    base-url: ${CAMARA_API_BASE_URL:}
+    token-url: ${CAMARA_API_TOKEN_URL:}
+    client-id: ${CAMARA_CLIENT_ID:}
+    client-secret: ${CAMARA_CLIENT_SECRET:}
+    scope: ${CAMARA_API_SCOPE:qod:sessions:create qod:sessions:read qod:sessions:delete}
+    default-phone: ${CAMARA_DEFAULT_PHONE:}
+    default-duration: ${CAMARA_DEFAULT_DURATION:3600}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.mcp.camara: DEBUG

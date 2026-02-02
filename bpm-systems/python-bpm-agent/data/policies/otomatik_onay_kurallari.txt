@@ -1,0 +1,68 @@
+# Otomatik Onay Kuralları
+
+## OTOMATİK ONAYLANIR
+Şu durumlar otomatik olarak onaylanabilir:
+
+### Teknik Destek
+- Standart modem resetleme talepleri
+- Basit konfigürasyon değişiklikleri
+- Bilgi talepleri (nasıl yapılır?)
+- Hız testi sonuçları paylaşımı
+
+### Fatura
+- 50 TL altı ücret iadeleri
+- Standart tarife değişiklikleri (aynı veya daha üst paket)
+- Otomatik ödeme talimatı kurulumu
+- E-fatura geçişi
+
+### İnsan Kaynakları
+- Yıllık izin talepleri (5 günden az)
+- Eğitim katılım onayları (standart eğitimler)
+- Çalışma belgesi talepleri
+- Adres değişikliği bildirimleri
+
+### Genel
+- Bilgi talepleri
+- Öneri bildirimleri
+- Teşekkür mesajları
+- Anket doldurma talepleri
+
+## MANUEL ONAY GEREKTİRİR
+Şu durumlar insan onayı gerektirir:
+
+### Kritik İşlemler
+- Abonelik iptali
+- 50 TL üzeri iadeler
+- Yasal işlemler
+- Sözleşme değişiklikleri
+
+### Yüksek Risk
+- Güvenlik değişiklikleri
+- Veri silme talepleri
+- Toplu işlemler
+- Sistem erişim yetkileri
+
+### Belirsiz Durumlar
+- Eksik bilgili talepler
+- Çelişkili talepler
+- Kategori dışı durumlar
+- İlk defa karşılaşılan senaryolar
+
+### Finansal Limitler
+- 50 TL üzeri işlemler
+- Toplu fatura düzeltmeleri
+- İstisna talepleri
+
+## ONAY AKIŞI
+1. **Otomatik Uygun** → Sistem direkt onaylar ve işleme alır
+2. **Manuel Gerekli** → İlgili yöneticiye gönderilir
+   - LOW/MEDIUM: İlk seviye yönetici
+   - HIGH: Departman müdürü
+   - URGENT: Üst yönetim
+3. **Belirsiz** → CustomerCare değerlendirir
+
+## ÖZEL KURALLAR
+- VIP müşteri talepleri: Her zaman manuel onay
+- Mesai dışı acil talepler: Nöbetçi yönetici onayı
+- Tekrarlanan talepler (3+): Manuel inceleme
+- Yasal zorunluluk: Compliance ekibi onayı

@@ -1,0 +1,754 @@
+<!--
+============================================================================
+USER UI - Chat Interface + Admin Debug Panel
+============================================================================
+
+Bu dosya kullanıcı arayüzünü içerir. İki panel var:
+1. User Panel: Chat arayüzü (WhatsApp benzeri)
+2. Admin Panel: Flow debug (SSE events, LLM reasoning vb.)
+
+FLOW'daki Rolü:
+- ① Kullanıcı mesajını Agent'a gönderir
+- ⑥ Agent'tan offer alır, gösterir
+- ⑦ Kullanıcı onayını Agent'a gönderir
+- ⑪⑬ MCP Server'dan SSE event'lerini dinler, gösterir
+- ⑭ Task done gösterir
+
+Teknolojiler:
+- Vanilla JavaScript (framework yok)
+- CSS Variables (WhatsApp renk paleti)
+- EventSource API (SSE için)
+
+Port: 3000 (server.js ile serve ediliyor)
+============================================================================
+-->
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP + CAMARA POC</title>
+  <style>
+    /* Reset - Tüm elementlerin default margin/padding'ini sıfırla */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* =========================================================================
+       WHATSAPP COLOR PALETTE
+       WhatsApp'ın karanlık temasından alınan renkler
+       ========================================================================= */
+    :root {
+      --wa-dark-green: #075e54;
+      /* Header arka planı */
+      --wa-teal: #128c7e;
+      /* Butonlar, vurgular */
+      --wa-light-green: #25d366;
+      /* Başarı, onay rengi */
+      --wa-chat-bg: #0b141a;
+      /* Ana arka plan (en koyu) */
+      --wa-panel-bg: #111b21;
+      /* Panel arka planı */
+      --wa-input-bg: #202c33;
+      /* Input alanları */
+      --wa-outgoing: #005c4b;
+      /* Giden mesaj (kullanıcı) */
+      --wa-incoming: #202c33;
+      /* Gelen mesaj (bot) */
+      --wa-text: #e9edef;
+      /* Ana metin rengi */
+      --wa-text-secondary: #8696a0;
+      /* İkincil metin (zaman vb.) */
+      --wa-border: #2a3942;
+      /* Kenarlıklar */
+    }
+
+    /* Ana body stili */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--wa-chat-bg);
+      color: var(--wa-text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* =========================================================================
+       HEADER
+       Üst bar - başlık ve panel geçiş butonu
+       ========================================================================= */
+    .header {
+      background: var(--wa-panel-bg);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--wa-border);
+    }
+
+    .header h1 {
+      font-size: 18px;
+      color: var(--wa-light-green);
+    }
+
+    /* Panel geçiş butonu */
+    .toggle-btn {
+      background: var(--wa-teal);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .toggle-btn:hover {
+      background: var(--wa-light-green);
+    }
+
+    /* Bandwidth Göstergesi */
+    .bandwidth-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--wa-input-bg);
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--wa-border);
+    }
+
+    .bandwidth-label {
+      color: var(--wa-text-secondary);
+      font-size: 12px;
+    }
+
+    .bandwidth-value {
+      color: var(--wa-light-green);
+      font-weight: bold;
+      font-size: 14px;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .bandwidth-value.updating {
+      animation: pulse 0.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    /* =========================================================================
+       CONTAINER & PANELS
+       Ana içerik alanı ve panel yapısı
+       ========================================================================= */
+    .container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      overflow: hidden;
+    }
+
+    .panel.hidden {
+      display: none;
+    }
+
+    /* Gizli panel */
+
+    /* =========================================================================
+       CHAT MESSAGES - USER PANEL
+       Mesaj baloncukları
+       ========================================================================= */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 15px;
+      padding: 10px;
+    }
+
+    .message {
+      padding: 8px 12px;
+      margin: 6px 0;
+      border-radius: 8px;
+      max-width: 85%;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    /* Kullanıcı mesajı - sağda, yeşil arka plan */
+    .message.user {
+      background: var(--wa-outgoing);
+      margin-left: auto;
+      /* Sağa yasla */
+      border-bottom-right-radius: 0;
+      /* WhatsApp baloncuk stili */
+    }
+
+    /* Bot mesajı - solda, koyu arka plan */
+    .message.bot {
+      background: var(--wa-incoming);
+      border-bottom-left-radius: 0;
+    }
+
+    /* Offer mesajı - sol kenarı yeşil çizgi */
+    .message.offer {
+      background: var(--wa-incoming);
+      border-left: 3px solid var(--wa-light-green);
+    }
+
+    /* Başarı mesajı */
+    .message.success {
+      background: var(--wa-incoming);
+      border-left: 3px solid var(--wa-light-green);
+    }
+
+    /* Çalışıyor/bekliyor mesajı */
+    .message.working {
+      background: var(--wa-incoming);
+      border-left: 3px solid var(--wa-teal);
+    }
+
+    /* =========================================================================
+       INPUT AREA
+       Mesaj yazma alanı
+       ========================================================================= */
+    .input-area {
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      background: var(--wa-panel-bg);
+      border-radius: 8px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 20px;
+      background: var(--wa-input-bg);
+      color: var(--wa-text);
+      font-size: 14px;
+    }
+
+    .input-area input::placeholder {
+      color: var(--wa-text-secondary);
+    }
+
+    /* Gönder butonu - yuvarlak */
+    .input-area button {
+      padding: 12px 20px;
+      background: var(--wa-teal);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      width: 48px;
+      height: 48px;
+    }
+
+    .input-area button:hover {
+      background: var(--wa-light-green);
+    }
+
+    /* =========================================================================
+       ADMIN PANEL - FLOW DEBUG
+       Debug bilgilerini gösteren panel
+       ========================================================================= */
+    .admin-panel {
+      background: var(--wa-panel-bg);
+    }
+
+    .admin-panel h2 {
+      margin-bottom: 15px;
+      color: var(--wa-light-green);
+      font-size: 16px;
+    }
+
+    .flow-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Her bir flow adımı */
+    .flow-step {
+      padding: 12px;
+      margin: 8px 0;
+      background: var(--wa-input-bg);
+      border-radius: 8px;
+      border-left: 3px solid var(--wa-border);
+      font-size: 13px;
+    }
+
+    /* Flow step renkleri - türe göre */
+    .flow-step.highlight {
+      border-left-color: var(--wa-light-green);
+    }
+
+    /* User input, offer */
+    .flow-step.llm {
+      border-left-color: #f59e0b;
+      background: #1a1a0a;
+    }
+
+    /* LLM related - turuncu */
+    .flow-step.tool {
+      border-left-color: #3b82f6;
+      background: #0a1a2a;
+    }
+
+    /* Tool related - mavi */
+    .flow-step.sse {
+      border-left-color: #8b5cf6;
+      background: #1a0a2a;
+    }
+
+    /* SSE related - mor */
+
+    /* Flow step header */
+    .flow-step .step-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .flow-step .step-label {
+      color: var(--wa-light-green);
+      font-weight: bold;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .flow-step .step-time {
+      color: var(--wa-text-secondary);
+      font-size: 11px;
+    }
+
+    .flow-step .step-content {
+      color: var(--wa-text);
+      margin-bottom: 8px;
+    }
+
+    /* JSON data gösterimi */
+    .flow-step .step-data {
+      padding: 8px;
+      background: var(--wa-chat-bg);
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--wa-text-secondary);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- =========================================================================
+       HEADER
+       ========================================================================= -->
+  <div class="header">
+    <h1>Network Assistant</h1>
+
+    <!-- Bandwidth Göstergesi -->
+    <div class="bandwidth-indicator">
+      <span class="bandwidth-label">Mevcut Bandwidth:</span>
+      <span class="bandwidth-value" id="bandwidthValue">200 Mbps</span>
+    </div>
+
+    <!-- Panel geçiş butonu - tıklandığında togglePanel() çağrılır -->
+    <button class="toggle-btn" onclick="togglePanel()">Admin Panel</button>
+  </div>
+
+  <div class="container">
+    <!-- =========================================================================
+         USER PANEL - Chat Arayüzü
+         ========================================================================= -->
+    <div class="panel" id="userPanel">
+      <!-- Mesajların gösterildiği alan -->
+      <div class="chat-messages" id="chatMessages"></div>
+
+      <!-- Mesaj yazma alanı -->
+      <div class="input-area">
+        <input type="text" id="messageInput" placeholder="İstediğiniz talebi yazın..."
+          onkeypress="handleKeyPress(event)">
+        <button onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+
+    <!-- =========================================================================
+         ADMIN PANEL - Flow Debug
+         ========================================================================= -->
+    <div class="panel hidden admin-panel" id="adminPanel">
+      <h2>Flow Debug Panel</h2>
+      <!-- Flow adımlarının gösterildiği alan -->
+      <div class="flow-list" id="flowList"></div>
+    </div>
+  </div>
+
+  <script>
+    // ===========================================================================
+    // CONFIGURATION
+    // ===========================================================================
+
+    // Agent API adresi - tüm istekler buraya gider (SSE dahil)
+    // flow.md'ye göre: UI ↔ Agent ↔ MCP Server
+    const AGENT_URL = 'http://localhost:5003';
+
+    // CAMARA API - sadece başlangıç bandwidth'i almak için
+    const CAMARA_URL = 'http://localhost:5002';
+
+    // Her sayfa yüklemesinde unique session ID oluştur
+    // Bu, pending action'ları takip etmek için kullanılıyor
+    let sessionId = 'session_' + Date.now();
+
+    // Aktif panel (user veya admin)
+    let currentPanel = 'user';
+
+    // Admin panel için flow adımları
+    let flowSteps = [];
+
+    // ===========================================================================
+    // INITIAL BANDWIDTH FETCH
+    // Sayfa yüklendiğinde CAMARA'dan mevcut bandwidth'i al
+    // ===========================================================================
+    async function fetchInitialBandwidth() {
+      try {
+        const response = await fetch(`${CAMARA_URL}/network-context`);
+        const data = await response.json();
+        const bandwidthEl = document.getElementById('bandwidthValue');
+        bandwidthEl.textContent = data.currentBandwidth;
+        console.log('[UI] Initial bandwidth fetched:', data.currentBandwidth);
+      } catch (err) {
+        console.error('[UI] Failed to fetch initial bandwidth:', err);
+      }
+    }
+
+    // Sayfa yüklendiğinde bandwidth'i al
+    window.addEventListener('DOMContentLoaded', fetchInitialBandwidth);
+
+    // ===========================================================================
+    // PANEL TOGGLE
+    // User ve Admin panel arasında geçiş
+    // ===========================================================================
+    function togglePanel() {
+      const userPanel = document.getElementById('userPanel');
+      const adminPanel = document.getElementById('adminPanel');
+      const btn = document.querySelector('.toggle-btn');
+
+      if (currentPanel === 'user') {
+        // User -> Admin geçişi
+        userPanel.classList.add('hidden');
+        adminPanel.classList.remove('hidden');
+        btn.textContent = 'User Panel';
+        currentPanel = 'admin';
+      } else {
+        // Admin -> User geçişi
+        adminPanel.classList.add('hidden');
+        userPanel.classList.remove('hidden');
+        btn.textContent = 'Admin Panel';
+        currentPanel = 'user';
+      }
+    }
+
+    // ===========================================================================
+    // CHAT MESSAGES
+    // User panel'e mesaj ekleme
+    // ===========================================================================
+    function addMessage(text, type = 'bot') {
+      const messages = document.getElementById('chatMessages');
+
+      // Yeni mesaj elementi oluştur
+      const msg = document.createElement('div');
+      msg.className = `message ${type}`;
+      msg.innerHTML = text; // innerHTML kullanıyoruz çünkü <strong> vs. olabilir
+
+      // Mesajı ekle ve scroll'u aşağı kaydır
+      messages.appendChild(msg);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    // ===========================================================================
+    // FLOW STEPS
+    // Admin panel'e flow adımı ekleme
+    // ===========================================================================
+    function addFlowStep(label, content, data = null, type = '') {
+      // Zaman damgası
+      const time = new Date().toLocaleTimeString();
+
+      // Flow step'i array'e ekle
+      flowSteps.push({ label, content, data, time, type });
+
+      // Panel'i yeniden render et
+      renderFlowSteps();
+    }
+
+    // Flow step'lerini HTML olarak render et
+    function renderFlowSteps() {
+      const list = document.getElementById('flowList');
+
+      // Her step için HTML oluştur
+      list.innerHTML = flowSteps.map((s, i) => `
+    <div class="flow-step ${s.type}">
+      <div class="step-header">
+        <span class="step-label">${s.label}</span>
+        <span class="step-time">${s.time}</span>
+      </div>
+      <div class="step-content">${s.content}</div>
+      ${s.data ? `<div class="step-data">${typeof s.data === 'object' ? JSON.stringify(s.data, null, 2) : s.data}</div>`
+          : ''}
+    </div>
+    `).join('');
+
+      // Scroll'u aşağı kaydır
+      list.scrollTop = list.scrollHeight;
+    }
+
+    // ===========================================================================
+    // EVENT HANDLERS
+    // ===========================================================================
+
+    // Enter tuşuna basıldığında mesaj gönder
+    function handleKeyPress(e) {
+      if (e.key === 'Enter') sendMessage();
+    }
+
+    // ===========================================================================
+    // SEND MESSAGE
+    // Ana mesaj gönderme fonksiyonu
+    // FLOW Adımları: ①⑥⑦
+    // ===========================================================================
+    async function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+
+      // Boş mesaj gönderme
+      if (!message) return;
+
+      // Input'u temizle
+      input.value = '';
+
+      // ① Kullanıcı mesajını göster
+      addMessage(message, 'user');
+
+      // Admin panel'e log ekle
+      addFlowStep('USER INPUT', `Kullanıcı mesajı: "${message}"`, null, 'highlight');
+
+      try {
+        // Agent'a POST isteği at
+        // FLOW: UI → Agent /chat
+        const response = await fetch(`${AGENT_URL}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, sessionId })
+        });
+
+        // Response'u parse et
+        const data = await response.json();
+
+        // =========================================================================
+        // ADMIN PANEL DEBUG LOGGING
+        // Agent'tan gelen tüm debug bilgilerini göster
+        // =========================================================================
+
+        // ②③ MCP'den alınan tool listesi
+        if (data.tools_obtained) {
+          addFlowStep(
+            'MCP TOOLS',
+            `${data.tools_obtained.length} tool MCP Server'dan alındı`,
+            data.tools_obtained,
+            'tool'
+          );
+        }
+
+        // ④ LLM'e gönderilen prompt
+        if (data.llm_input) {
+          addFlowStep(
+            'LLM INPUT',
+            'Gemini\'ye gönderilen prompt',
+            data.llm_input,
+            'llm'
+          );
+        }
+
+        // ⑤ LLM'den dönen ham yanıt
+        if (data.llm_raw_response) {
+          addFlowStep(
+            'LLM RAW RESPONSE',
+            'Gemini\'den dönen ham yanıt',
+            data.llm_raw_response,
+            'llm'
+          );
+        }
+
+        // LLM'in reasoning'i - neden bu tool seçildi
+        if (data.llm_reasoning) {
+          addFlowStep(
+            'LLM REASONING',
+            `Seçilen Tool: ${data.tool || 'Yok'}`,
+            {
+              reasoning: data.llm_reasoning,
+              selected_tool: data.tool,
+              parameters: data.parameters
+            },
+            'llm'
+          );
+        }
+
+        // =========================================================================
+        // RESPONSE TYPE HANDLING
+        // =========================================================================
+
+        if (data.type === 'offer') {
+          // ⑥ Kullanıcıya offer göster
+          const offerMsg = `<strong>${data.offer_text}</strong>`;
+          addMessage(offerMsg, 'offer');
+
+          addFlowStep(
+            'OFFER',
+            'Kullanıcıya teklif sunuldu',
+            { offer: data.offer_text, tool: data.tool, parameters: data.parameters },
+            'highlight'
+          );
+        }
+        else if (data.type === 'executing') {
+          // İşlem başladı - SSE bağlantısı aç
+          // Mesaj artık SSE üzerinden gelecek (flow.md'ye uygun)
+
+          // ⑦a - Kullanıcı onayı algılandıysa log ekle
+          if (data.confirmation_detected) {
+            addFlowStep(
+              'CONFIRMATION',
+              `Kullanıcı onayladı: ${data.confirmed_action}`,
+              null,
+              'highlight'
+            );
+          }
+
+          addFlowStep(
+            'EXECUTE',
+            `Tool çalıştırılıyor: ${data.tool}`,
+            { taskId: data.taskId },
+            'tool'
+          );
+
+          // SSE bağlantısı aç ve event'leri dinle
+          connectSSE(data.taskId);
+        }
+        else if (data.type === 'cancelled') {
+          // Kullanıcı iptal etti
+          addMessage(data.message, 'bot');
+          addFlowStep('CANCELLED', 'İşlem kullanıcı tarafından iptal edildi', null, '');
+        }
+        else {
+          // Normal mesaj
+          addMessage(data.message, 'bot');
+        }
+
+      } catch (err) {
+        // Hata durumunda
+        addMessage('Hata: ' + err.message, 'bot');
+        addFlowStep('ERROR', err.message, null, '');
+      }
+    }
+
+    // ===========================================================================
+    // SSE CONNECTION (flow.md'ye uygun)
+    // Server-Sent Events ile real-time update'leri dinle
+    // FLOW: UI ←──SSE──→ Agent ←──SSE──→ MCP Server
+    // ===========================================================================
+    function connectSSE(taskId) {
+      // Admin panel'e SSE başlangıcını log'la
+      addFlowStep('SSE', `SSE bağlantısı açılıyor (Agent üzerinden, taskId: ${taskId})`, null, 'sse');
+
+      // EventSource API ile SSE bağlantısı aç
+      // flow.md'ye göre: UI → Agent → MCP Server (Agent proxy yapıyor)
+      const eventSource = new EventSource(`${AGENT_URL}/sse/${taskId}`);
+
+      // Her SSE event'i için çağrılır
+      eventSource.onmessage = (event) => {
+        // JSON parse et
+        const data = JSON.parse(event.data);
+        const bandwidthEl = document.getElementById('bandwidthValue');
+
+        if (data.type === 'connected') {
+          // Bağlantı kuruldu
+          addFlowStep('SSE', 'Bağlantı kuruldu', null, 'sse');
+        }
+        else if (data.type === 'update') {
+          // WORKING status - işlem devam ediyor
+
+          // User panel: SADECE userMessage varsa göster
+          if (data.userMessage) {
+            addMessage(data.userMessage, 'working');
+            // Bu gerçek bir SSE Update (flow.md: 11)
+            addFlowStep('SSE UPDATE', `Adım ${data.step}: ${data.message}`, data, 'sse');
+          } else {
+            // userMessage yoksa bu bir INTERNAL logdur (flow.md: 9, 10, 12)
+            // Admin panelde farklı görünsün
+            addFlowStep('INTERNAL LOG', `Debug: ${data.message}`, data, 'tool');
+          }
+
+          // Bandwidth göstergesini güncelle (işlem devam ediyor - animasyon)
+          if (data.currentBandwidth) {
+            bandwidthEl.textContent = data.currentBandwidth;
+            bandwidthEl.classList.add('updating');
+          }
+        }
+        else if (data.type === 'complete') {
+          // SUCCESS - işlem tamamlandı
+          // User panel: userMessage, Admin: message (teknik)
+          addMessage(`<strong>${data.userMessage || data.message}</strong>`, 'success');
+          addFlowStep('SSE COMPLETE', 'İşlem başarıyla tamamlandı', data.result, 'sse');
+
+          // Bandwidth göstergesini final değerle güncelle
+          if (data.finalBandwidth) {
+            bandwidthEl.textContent = data.finalBandwidth;
+            bandwidthEl.classList.remove('updating');
+          }
+
+          // Bağlantıyı kapat
+          eventSource.close();
+        }
+        else if (data.type === 'error') {
+          // Hata
+          addMessage('Hata: ' + data.message, 'bot');
+          addFlowStep('SSE ERROR', data.message, null, 'sse');
+          bandwidthEl.classList.remove('updating');
+          eventSource.close();
+        }
+      };
+
+      // Bağlantı hatası
+      eventSource.onerror = () => {
+        const bandwidthEl = document.getElementById('bandwidthValue');
+        bandwidthEl.classList.remove('updating');
+        addFlowStep('SSE', 'Bağlantı kapandı', null, 'sse');
+        eventSource.close();
+      };
+    }
+  </script>
+</body>
+
+</html>

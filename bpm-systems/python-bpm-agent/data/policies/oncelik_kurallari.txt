@@ -1,0 +1,40 @@
+# Öncelik Belirleme Kuralları
+
+## URGENT (Acil)
+- 24 saatten uzun süren kesintiler
+- Toplu müşteri etkileyen sorunlar
+- Güvenlik/Veri ihlali riski
+- Yasal zorunluluk gerektiren durumlar
+- Çok kızgın müşteriler (sentiment: ANGRY)
+- SLA ihlal riski
+
+## HIGH (Yüksek)
+- 12-24 saat arası kesintiler
+- İş kritik hizmetler etkileniyor
+- Tekrarlanan şikayetler (3+ kez)
+- Ticari müşteri talepleri
+- Fatura itirazları (büyük tutarlar)
+
+## MEDIUM (Orta)
+- 1-12 saat arası sorunlar
+- Hizmet kalitesi düşüklüğü
+- Rutin teknik problemler
+- Standart tarife değişiklikleri
+- Genel bilgi talepleri
+
+## LOW (Düşük)
+- Gelecek tarihli talepler
+- İnformatif sorular
+- Öneri ve geri bildirimler
+- Rutin işlemler
+- Aciliyet belirtilmemiş talepler
+
+## Zamanlama Kuralları
+- İlk 1 saat içinde: Otomatik MEDIUM
+- 12 saat içinde çözülmezse: HIGH'a yükselt
+- 24 saat içinde çözülmezse: URGENT'e yükselt
+
+## Müşteri Tipi Faktörü
+- Premium müşteri: +1 seviye (LOW → MEDIUM, MEDIUM → HIGH)
+- Ticari müşteri: +1 seviye
+- VIP müşteri: Direkt HIGH veya URGENT

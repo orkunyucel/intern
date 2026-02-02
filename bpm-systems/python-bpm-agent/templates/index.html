@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPM Intelligent Intake Agent - Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/call-player.js"></script>
+    <script src="/static/audio-uploader.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .badge-urgent { background: #ef4444; }
+        .badge-high { background: #f59e0b; }
+        .badge-medium { background: #3b82f6; }
+        .badge-low { background: #10b981; }
+        .loading {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .wave {
+            animation: wave 1.5s ease-in-out infinite;
+        }
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1); }
+        }
+        .tab-active {
+            border-bottom: 3px solid #667eea;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="gradient-bg text-white py-6 mb-8">
+        <div class="container mx-auto px-6">
+            <h1 class="text-3xl font-bold mb-2">🤖 BPM Intelligent Intake Agent</h1>
+            <p class="text-purple-100">AI-Powered Request Analysis & Routing Demo</p>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-6 pb-12">
+        <!-- Stats Bar -->
+        <div class="grid grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">API Status</p>
+                        <p id="api-status" class="text-2xl font-bold text-green-600">●</p>
+                    </div>
+                    <div class="text-4xl">🟢</div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Qdrant Docs</p>
+                        <p id="docs-count" class="text-2xl font-bold text-purple-600">-</p>
+                    </div>
+                    <div class="text-4xl">📚</div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Tests Run</p>
+                        <p id="tests-run" class="text-2xl font-bold text-blue-600">0</p>
+                    </div>
+                    <div class="text-4xl">✅</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-xl mb-6 card-shadow">
+            <div class="flex border-b">
+                <button onclick="switchTab('text')" id="tab-text" class="px-6 py-4 font-semibold tab-active">
+                    📝 Text Scenarios
+                </button>
+                <button onclick="switchTab('call')" id="tab-call" class="px-6 py-4 font-semibold text-gray-500">
+                    📞 Phone Call Processing
+                </button>
+                <button onclick="switchTab('upload')" id="tab-upload" class="px-6 py-4 font-semibold text-gray-500">
+                    📁 Upload Real Call
+                </button>
+            </div>
+        </div>
+
+        <!-- Text Scenarios Tab -->
+        <div id="text-content" class="grid grid-cols-3 gap-8">
+            <!-- Left: Test Scenarios -->
+            <div class="col-span-1">
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h2 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-2">🧪</span> Test Scenarios
+                    </h2>
+                    <div id="scenarios-list" class="space-y-3">
+                        <!-- Scenarios will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Results -->
+            <div class="col-span-2 space-y-6">
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h2 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-2">📊</span> Test Results
+                    </h2>
+                    <div id="results-container">
+                        <div class="text-center py-12 text-gray-400">
+                            <div class="text-6xl mb-4">👆</div>
+                            <p class="text-lg">Select a test scenario to see results</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Qdrant Dashboard -->
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h2 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-2">🗄️</span> Qdrant Vector Database
+                    </h2>
+                    <div id="qdrant-info" class="space-y-2 text-sm">
+                        <!-- Qdrant info will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phone Call Tab -->
+        <div id="call-content" class="hidden grid-cols-3 gap-8">
+            <!-- Left: Call Scenarios -->
+            <div class="col-span-1">
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h2 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-2">📞</span> Call Scenarios
+                    </h2>
+                    <div id="call-scenarios-list" class="space-y-3">
+                        <!-- Call scenarios will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Call Results -->
+            <div class="col-span-2 space-y-6">
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h2 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-2">🎙️</span> Call Processing Results
+                    </h2>
+                    <div id="call-results-container">
+                        <div class="text-center py-12 text-gray-400">
+                            <div class="text-6xl mb-4">☎️</div>
+                            <p class="text-lg">Select a call scenario to process</p>
+                            <p class="text-sm mt-2">Simulates: Speech-to-Text → Sentiment Analysis → Agent Decision</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Real Call Tab -->
+        <div id="upload-content" class="hidden">
+            <!-- Content populated by audio-uploader.js -->
+        </div>
+    </div>
+
+    <script>
+        let testsRun = 0;
+        let currentTab = 'text';
+
+        // Switch tabs
+        function switchTab(tab) {
+            currentTab = tab;
+
+            // Reset all tabs
+            const tabs = ['text', 'call', 'upload'];
+            tabs.forEach(t => {
+                const tabBtn = document.getElementById(`tab-${t}`);
+                const content = document.getElementById(`${t}-content`);
+                
+                tabBtn.classList.remove('tab-active');
+                tabBtn.classList.add('text-gray-500');
+                content.classList.add('hidden');
+                content.classList.remove('grid');
+            });
+
+            // Activate selected tab
+            const activeTabBtn = document.getElementById(`tab-${tab}`);
+            const activeContent = document.getElementById(`${tab}-content`);
+            
+            activeTabBtn.classList.add('tab-active');
+            activeTabBtn.classList.remove('text-gray-500');
+            activeContent.classList.remove('hidden');
+            
+            if (tab !== 'upload') {
+                activeContent.classList.add('grid');
+            }
+
+            // Initialize upload tab on first open
+            if (tab === 'upload' && !window.uploadInitialized) {
+                window.audioUploader.initUploader();
+                window.uploadInitialized = true;
+            }
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+
+                document.getElementById('api-status').textContent = data.api_status === 'running' ? '●' : '○';
+                document.getElementById('docs-count').textContent = data.documents_count || '-';
+
+                const qdrantInfo = document.getElementById('qdrant-info');
+                qdrantInfo.innerHTML = `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">Collection Name:</span>
+                        <span class="font-mono font-semibold">${data.collection_name || 'N/A'}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">Total Documents:</span>
+                        <span class="font-mono font-semibold">${data.documents_count || 0}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">Status:</span>
+                        <span class="font-semibold text-green-600">${data.qdrant_status === 'ok' ? '✓ Connected' : '✗ Error'}</span>
+                    </div>
+                    <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p class="text-xs text-blue-800">
+                            <strong>💡 Info:</strong> Qdrant stores vectorized policy documents for RAG context.
+                        </p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load text scenarios
+        async function loadScenarios() {
+            try {
+                const response = await fetch('/api/scenarios');
+                const data = await response.json();
+
+                const container = document.getElementById('scenarios-list');
+                container.innerHTML = data.scenarios.map(scenario => `
+                    <button
+                        onclick="runTest(${scenario.id})"
+                        class="w-full text-left p-4 rounded-lg border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all duration-200"
+                    >
+                        <div class="font-semibold text-sm mb-1">${scenario.name}</div>
+                        <div class="text-xs text-gray-500">${scenario.description}</div>
+                    </button>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading scenarios:', error);
+            }
+        }
+
+        // Load call scenarios
+        async function loadCallScenarios() {
+            try {
+                const response = await fetch('/api/call/scenarios');
+                const data = await response.json();
+
+                const container = document.getElementById('call-scenarios-list');
+                container.innerHTML = data.scenarios.map(scenario => `
+                    <button
+                        onclick="processCall(${scenario.id})"
+                        class="w-full text-left p-4 rounded-lg border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
+                    >
+                        <div class="font-semibold text-sm mb-1">${scenario.name}</div>
+                        <div class="text-xs text-gray-500">${scenario.description}</div>
+                        <div class="mt-2 flex gap-2 text-xs">
+                            <span class="bg-gray-100 px-2 py-1 rounded">🗣️ ${scenario.transcription.metadata.speaking_rate} wpm</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded">🎵 ${scenario.transcription.metadata.pitch_variance} pitch</span>
+                        </div>
+                    </button>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading call scenarios:', error);
+            }
+        }
+
+        // Run text test
+        async function runTest(scenarioId) {
+            const scenarios = await (await fetch('/api/scenarios')).json();
+            const scenario = scenarios.scenarios.find(s => s.id === scenarioId);
+
+            if (!scenario) return;
+
+            const resultsContainer = document.getElementById('results-container');
+            resultsContainer.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="loading mx-auto mb-4"></div>
+                    <p class="text-gray-600">Analyzing request with AI Agent...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/intake', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(scenario.request)
+                });
+
+                const result = await response.json();
+
+                testsRun++;
+                document.getElementById('tests-run').textContent = testsRun;
+
+                const priorityColors = {
+                    'URGENT': 'badge-urgent',
+                    'HIGH': 'badge-high',
+                    'MEDIUM': 'badge-medium',
+                    'LOW': 'badge-low'
+                };
+
+                resultsContainer.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between pb-4 border-b">
+                            <h3 class="text-lg font-bold">${scenario.name}</h3>
+                            <span class="text-sm text-gray-500">Case ID: ${result.case_id}</span>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p class="text-sm font-semibold text-gray-600 mb-2">📝 Customer Request:</p>
+                            <p class="text-gray-800">"${scenario.request.text}"</p>
+                            <div class="mt-3 flex gap-3 text-xs text-gray-500">
+                                <span>👤 ${scenario.request.customer_id}</span>
+                                <span>📍 ${scenario.request.source}</span>
+                                <span>😊 ${scenario.request.sentiment}</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <p class="text-xs text-purple-600 font-semibold mb-2">CATEGORY</p>
+                                <p class="text-lg font-bold">${result.category}</p>
+                            </div>
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <p class="text-xs text-purple-600 font-semibold mb-2">PRIORITY</p>
+                                <div class="flex items-center gap-2">
+                                    <span class="${priorityColors[result.priority]} text-white px-3 py-1 rounded-full text-sm font-bold">
+                                        ${result.priority}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="text-xs text-blue-600 font-semibold mb-2">🎯 INTENT DETECTED</p>
+                            <p class="text-gray-800">${result.intent}</p>
+                        </div>
+
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <p class="text-xs text-green-600 font-semibold mb-3">⚡ ACTIONS EXECUTED</p>
+                            <div class="space-y-2">
+                                ${result.actions_taken.map(action => `
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-600 mt-1">✓</span>
+                                        <span class="text-sm text-gray-700">${action}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p class="text-xs text-gray-600 font-semibold mb-2">🧠 AI REASONING</p>
+                            <p class="text-sm text-gray-700 leading-relaxed">${result.reasoning}</p>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-lg ${result.auto_approve ? 'bg-green-50' : 'bg-yellow-50'}">
+                            <span class="font-semibold ${result.auto_approve ? 'text-green-700' : 'text-yellow-700'}">
+                                ${result.auto_approve ? '✅ Auto-Approved' : '⚠️ Manual Review Required'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                resultsContainer.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-6xl mb-4">❌</div>
+                        <p class="text-red-600 font-semibold mb-2">Error running test</p>
+                        <p class="text-sm text-gray-600">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Process call (now uses CallPlayer)
+        async function processCall(scenarioId) {
+            const scenarios = await (await fetch('/api/call/scenarios')).json();
+            const scenario = scenarios.scenarios.find(s => s.id === scenarioId);
+
+            if (!scenario) return;
+
+            // Use CallPlayer for audio + transcription
+            window.callPlayer.playCall(scenario);
+        }
+
+        // Old direct processing (kept for reference, not used)
+        async function processCallDirect(scenarioId) {
+            const scenarios = await (await fetch('/api/call/scenarios')).json();
+            const scenario = scenarios.scenarios.find(s => s.id === scenarioId);
+
+            if (!scenario) return;
+
+            const resultsContainer = document.getElementById('call-results-container');
+            resultsContainer.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="mb-4 flex justify-center gap-2">
+                        <div class="w-2 h-12 bg-purple-500 rounded wave" style="animation-delay: 0s"></div>
+                        <div class="w-2 h-12 bg-purple-500 rounded wave" style="animation-delay: 0.1s"></div>
+                        <div class="w-2 h-12 bg-purple-500 rounded wave" style="animation-delay: 0.2s"></div>
+                        <div class="w-2 h-12 bg-purple-500 rounded wave" style="animation-delay: 0.3s"></div>
+                        <div class="w-2 h-12 bg-purple-500 rounded wave" style="animation-delay: 0.4s"></div>
+                    </div>
+                    <p class="text-gray-600 font-semibold">Processing Call...</p>
+                    <p class="text-sm text-gray-500 mt-2">Speech-to-Text → Sentiment Analysis → Routing</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/call/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        scenario_id: scenarioId,
+                        customer_id: scenario.customer_id
+                    })
+                });
+
+                const result = await response.json();
+
+                testsRun++;
+                document.getElementById('tests-run').textContent = testsRun;
+
+                const priorityColors = {
+                    'URGENT': 'badge-urgent',
+                    'HIGH': 'badge-high',
+                    'MEDIUM': 'badge-medium',
+                    'LOW': 'badge-low'
+                };
+
+                resultsContainer.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between pb-4 border-b">
+                            <h3 class="text-lg font-bold">${scenario.name}</h3>
+                            <span class="text-sm text-gray-500">Case ID: ${result.case_id}</span>
+                        </div>
+
+                        <!-- Transcription -->
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="text-sm font-semibold text-blue-600 mb-2">🎙️ TRANSCRIPTION (Speech-to-Text)</p>
+                            <p class="text-gray-800 mb-3">"${scenario.transcription.text}"</p>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Confidence:</span>
+                                    <span class="font-semibold">${(result.call_metadata.transcription_confidence * 100).toFixed(0)}%</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Duration:</span>
+                                    <span class="font-semibold">${result.call_metadata.call_duration}s</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Speaking Rate:</span>
+                                    <span class="font-semibold">${result.call_metadata.speaking_rate} wpm</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Pitch Variance:</span>
+                                    <span class="font-semibold">${result.call_metadata.pitch_variance}</span>
+                                </div>
+                            </div>
+                            ${result.call_metadata.emotion_markers && result.call_metadata.emotion_markers.length > 0 ? `
+                                <div class="mt-3 pt-3 border-t border-blue-200">
+                                    <p class="text-xs text-blue-600 font-semibold mb-2">Emotion Markers:</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        ${result.call_metadata.emotion_markers.map(marker => `
+                                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">${marker}</span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${result.call_metadata.repetitions && result.call_metadata.repetitions.length > 0 ? `
+                                <div class="mt-2">
+                                    <p class="text-xs text-blue-600 font-semibold mb-1">Repeated Words:</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        ${result.call_metadata.repetitions.map(word => `
+                                            <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">${word}</span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <p class="text-xs text-purple-600 font-semibold mb-2">CATEGORY</p>
+                                <p class="text-lg font-bold">${result.category}</p>
+                            </div>
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <p class="text-xs text-purple-600 font-semibold mb-2">PRIORITY</p>
+                                <div class="flex items-center gap-2">
+                                    <span class="${priorityColors[result.priority]} text-white px-3 py-1 rounded-full text-sm font-bold">
+                                        ${result.priority}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="text-xs text-blue-600 font-semibold mb-2">🎯 INTENT DETECTED</p>
+                            <p class="text-gray-800">${result.intent}</p>
+                        </div>
+
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <p class="text-xs text-green-600 font-semibold mb-3">⚡ ACTIONS EXECUTED</p>
+                            <div class="space-y-2">
+                                ${result.actions_taken.map(action => `
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-600 mt-1">✓</span>
+                                        <span class="text-sm text-gray-700">${action}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p class="text-xs text-gray-600 font-semibold mb-2">🧠 AI REASONING</p>
+                            <p class="text-sm text-gray-700 leading-relaxed">${result.reasoning}</p>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-lg ${result.auto_approve ? 'bg-green-50' : 'bg-yellow-50'}">
+                            <span class="font-semibold ${result.auto_approve ? 'text-green-700' : 'text-yellow-700'}">
+                                ${result.auto_approve ? '✅ Auto-Approved' : '⚠️ Manual Review Required'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                resultsContainer.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-6xl mb-4">❌</div>
+                        <p class="text-red-600 font-semibold mb-2">Error processing call</p>
+                        <p class="text-sm text-gray-600">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadScenarios();
+            loadCallScenarios();
+
+            // Refresh stats every 10 seconds
+            setInterval(loadStats, 10000);
+        });
+    </script>
+</body>
+</html>

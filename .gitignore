@@ -1,10 +1,81 @@
-# macOS
+############################
+# OS
+############################
 .DS_Store
+Thumbs.db
 
-# Java / Maven
-target/
-*.log
-
-# IDE
-.idea/
+############################
+# IDE / Editor
+############################
 .vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*.tmp
+
+############################
+# Java / Maven / Gradle
+############################
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+dependency-reduced-pom.xml
+
+############################
+# Spring / Logs
+############################
+*.log
+logs/
+*.out
+
+############################
+# Node.js
+############################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+
+############################
+# Python
+############################
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+pip-log.txt
+
+############################
+# Docker
+############################
+*.pid
+*.sock
+
+############################
+# Generated / Data
+############################
+*.csv
+*.tsv
+*.jsonl
+*.parquet
+*.avro
+*.proto.lock
+benchmark_results.*
+
+############################
+# Secrets (never commit)
+############################
+.env.*
+*.key
+*.pem
+*.crt
+*.secret

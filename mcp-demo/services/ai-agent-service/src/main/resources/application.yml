@@ -1,0 +1,26 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: ai-agent-service
+
+# Service connections
+llm-service:
+  url: http://localhost:8082
+
+mcp-server:
+  url: http://localhost:8083/mcp/jsonrpc
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.mcp.agent: DEBUG

@@ -1,0 +1,6 @@
+{
+  "source": "email",
+  "text": "Son faturamda 500 TL fazla ücret var, lütfen düzeltin",
+  "customer_id": "CUST-67890",
+  "sentiment": "FRUSTRATED"
+}

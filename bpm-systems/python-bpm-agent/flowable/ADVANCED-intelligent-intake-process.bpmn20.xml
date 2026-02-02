@@ -1,0 +1,822 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="http://www.flowable.org/processdef">
+
+  <process id="advancedIntakeProcess" name="🚀 Advanced Intelligent Intake Process" isExecutable="true">
+
+    <documentation>
+      ADVANCED INTELLIGENT BPM INTAKE WORKFLOW
+
+      Real-World Enterprise Process with Full Granularity:
+
+      1. START
+      2. Source Detection (text vs audio)
+      3. [AUDIO PATH] Speech-to-Text (Whisper)
+      4. [AI ANALYSIS PIPELINE - 6 separate nodes]
+         → Sentiment Analysis (LLM-based emotion detection)
+         → Text Embedding (Gemini text-embedding-004)
+         → Qdrant Vector Search (RAG retrieval)
+         → Reranking (Improve search quality)
+         → Build RAG Context
+         → Gemini LLM Decision Making
+      5. Parse LLM Response
+      6. Sub-Categorization (Department-specific routing)
+      7. [MCP TOOLS - 3 parallel nodes]
+         → Update Category
+         → Set Priority
+         → Create Task
+      8. Priority-Based Routing (URGENT/HIGH/MEDIUM/LOW)
+      9. [DEPARTMENT SUB-ROUTING]
+         → TECH_SUPPORT: Internet/Email/Software/Hardware/Security
+         → BILLING: Payment/Invoice/Refund/Subscription
+         → HR: Leave/Onboarding/Performance/Payroll
+      10. User Task Assignment
+      11. Store to Vector DB
+      12. END
+
+      Advanced Features:
+      - Every AI component as separate node
+      - Department sub-categorization with SLA rules
+      - Parallel tool execution
+      - Granular error handling
+      - Real-time visualization
+    </documentation>
+
+    <!-- ==================== START EVENT ==================== -->
+    <startEvent id="start" name="📥 Customer Request"/>
+
+    <sequenceFlow id="flow_start" sourceRef="start" targetRef="sourceGateway"/>
+
+    <!-- ==================== GATEWAY: Source Type ==================== -->
+    <exclusiveGateway id="sourceGateway" name="📞 Audio or Text?"/>
+
+    <sequenceFlow id="audioPath" name="Audio" sourceRef="sourceGateway" targetRef="speechToText">
+      <conditionExpression xsi:type="tFormalExpression">${source == 'phone' || source == 'audio'}</conditionExpression>
+    </sequenceFlow>
+
+    <sequenceFlow id="textPath" name="Text" sourceRef="sourceGateway" targetRef="sentimentAnalysis">
+      <conditionExpression xsi:type="tFormalExpression">${source == 'text' || source == 'form' || source == 'email'}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- ==================== AUDIO PATH: Speech-to-Text ==================== -->
+    <serviceTask id="speechToText" name="🎤 Speech-to-Text" flowable:type="http">
+      <documentation>Whisper ASR - Convert audio to text</documentation>
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/text-to-speech</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{"audio_path": "${audioPath}", "language": "tr"}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>transcriptionResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow_stt_parse" sourceRef="speechToText" targetRef="parseTranscription"/>
+
+    <scriptTask id="parseTranscription" name="📝 Parse Transcription" scriptFormat="javascript">
+      <script><![CDATA[
+        var result = transcriptionResult;
+        if (typeof result === 'string') result = JSON.parse(result);
+        execution.setVariable('processedText', result.text || question);
+      ]]></script>
+    </scriptTask>
+
+    <sequenceFlow id="flow_parse_sentiment" sourceRef="parseTranscription" targetRef="sentimentAnalysis"/>
+
+    <!-- ==================== AI PIPELINE START ==================== -->
+
+    <!-- 1. SENTIMENT ANALYSIS -->
+    <serviceTask id="sentimentAnalysis" name="😊 Sentiment Analysis" flowable:type="http">
+      <documentation>LLM-based emotion detection with urgency justification</documentation>
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/sentiment</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "text": "${source == 'text' ? question : processedText}",
+  "source": "${source}"
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>sentimentResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow_sentiment_embedding" sourceRef="sentimentAnalysis" targetRef="generateEmbedding"/>
+
+    <!-- 2. GENERATE EMBEDDING -->
+    <serviceTask id="generateEmbedding" name="🧮 Generate Embedding" flowable:type="http">
+      <documentation>Gemini text-embedding-004 (768-dim vector)</documentation>
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/embedding</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "text": "${source == 'text' ? question : processedText}"
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>embeddingResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow_embedding_search" sourceRef="generateEmbedding" targetRef="qdrantSearch"/>
+
+    <!-- 3. QDRANT VECTOR SEARCH -->
+    <serviceTask id="qdrantSearch" name="🔍 Qdrant Search" flowable:type="http">
+      <documentation>Search policy documents in vector database</documentation>
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/qdrant-search</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "embedding": ${embeddingResult.embedding},
+  "limit": 10
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>searchResults</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow_search_rerank" sourceRef="qdrantSearch" targetRef="rerankResults"/>
+
+    <!-- 4. RERANKING -->
+    <serviceTask id="rerankResults" name="🔄 Rerank Results" flowable:type="http">
+      <documentation>Improve search quality with semantic reranking</documentation>
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/rag-reranking</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "query": "${source == 'text' ? question : processedText}",
+  "results": ${searchResults.results},
+  "top_k": 5
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>rerankedResults</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow_rerank_context" sourceRef="rerankResults" targetRef="buildRAGContext"/>
+
+    <!-- 5. BUILD RAG CONTEXT -->
+    <scriptTask id="buildRAGContext" name="📚 Build RAG Context" scriptFormat="javascript">
+      <documentation>Format search results into LLM context</documentation>
+      <script><![CDATA[
+        var results = rerankedResults.reranked_results || [];
+        var contextParts = [];
+
+        for (var i = 0; i < results.length && i < 5; i++) {
+          var doc = results[i];
+          contextParts.push("Kaynak " + (i+1) + " (score: " + (doc.final_score || doc.score || 0).toFixed(2) + "):\n" + doc.text);
+        }
+
+        var ragContext = contextParts.join("\n\n");
+        execution.setVariable('ragContext', ragContext || 'İlgili politika bulunamadı.');
+      ]]></script>
+    </scriptTask>
+
+    <sequenceFlow id="flow_context_llm" sourceRef="buildRAGContext" targetRef="geminiLLMCall"/>
+
+    <!-- 6. GEMINI LLM CALL -->
+    <serviceTask id="geminiLLMCall" name="🤖 Gemini LLM (Decision)" flowable:type="http">
+      <documentation>LLM decision making with RAG context and sentiment</documentation>
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/llm-call</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "text": "${source == 'text' ? question : processedText}",
+  "rag_context": "${ragContext}",
+  "sentiment": ${sentimentResult}
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>llmResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow_llm_parse" sourceRef="geminiLLMCall" targetRef="parseLLMResponse"/>
+
+    <!-- ==================== PARSE LLM RESPONSE ==================== -->
+    <scriptTask id="parseLLMResponse" name="📊 Parse LLM Response" scriptFormat="javascript">
+      <script><![CDATA[
+        var llm = llmResult;
+        if (typeof llm === 'string') llm = JSON.parse(llm);
+
+        execution.setVariable('intent', llm.intent || 'UNKNOWN');
+        execution.setVariable('aiCategory', llm.category || 'GENERAL');
+        execution.setVariable('aiPriority', llm.priority || 'MEDIUM');
+        execution.setVariable('autoApprove', llm.auto_approve || false);
+        execution.setVariable('reasoning', llm.reasoning || '');
+        execution.setVariable('toolCalls', JSON.stringify(llm.tool_calls || []));
+      ]]></script>
+    </scriptTask>
+
+    <sequenceFlow id="flow_parse_subcat" sourceRef="parseLLMResponse" targetRef="subCategorization"/>
+
+    <!-- ==================== SUB-CATEGORIZATION ==================== -->
+    <serviceTask id="subCategorization" name="🏢 Sub-Categorization" flowable:type="http">
+      <documentation>Department-specific routing (TECH->Internet/Email, BILLING->Payment/Invoice, etc.)</documentation>
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/sub-categorization</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "category": "${aiCategory}",
+  "text": "${source == 'text' ? question : processedText}",
+  "intent": "${intent}"
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>subCatResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow_subcat_parse" sourceRef="subCategorization" targetRef="parseSubCat"/>
+
+    <scriptTask id="parseSubCat" name="📋 Parse Sub-Category" scriptFormat="javascript">
+      <script><![CDATA[
+        var subCat = subCatResult;
+        if (typeof subCat === 'string') subCat = JSON.parse(subCat);
+
+        execution.setVariable('subCategory', subCat.sub_category || 'general');
+        execution.setVariable('assignedTeam', subCat.assigned_team || 'General Support');
+        var routingRules = subCat.routing_rules || {};
+        execution.setVariable('slaHours', routingRules.sla_hours || 48);
+      ]]></script>
+    </scriptTask>
+
+    <sequenceFlow id="flow_parsesubcat_mcpparallel" sourceRef="parseSubCat" targetRef="mcpParallel"/>
+
+    <!-- ==================== PARALLEL GATEWAY: MCP TOOLS ==================== -->
+    <parallelGateway id="mcpParallel" name="⚡ Execute Tools"/>
+
+    <sequenceFlow id="flow_mcp_updatecat" sourceRef="mcpParallel" targetRef="updateCategory"/>
+    <sequenceFlow id="flow_mcp_setpriority" sourceRef="mcpParallel" targetRef="setPriority"/>
+    <sequenceFlow id="flow_mcp_createtask" sourceRef="mcpParallel" targetRef="createTask"/>
+
+    <!-- MCP TOOL 1: Update Category -->
+    <serviceTask id="updateCategory" name="📁 Update Category" flowable:type="http">
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/mcp/update-category</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "params": {
+    "category": "${aiCategory}",
+    "sub_category": "${subCategory}",
+    "customer_id": "${customerId}"
+  }
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>categoryResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>false</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- MCP TOOL 2: Set Priority -->
+    <serviceTask id="setPriority" name="⚡ Set Priority" flowable:type="http">
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/mcp/set-priority</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "params": {
+    "priority": "${aiPriority}",
+    "customer_id": "${customerId}",
+    "sla_hours": ${slaHours}
+  }
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>priorityResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>false</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- MCP TOOL 3: Create Task -->
+    <serviceTask id="createTask" name="📝 Create Task" flowable:type="http">
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/mcp/create-task</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "params": {
+    "team": "${assignedTeam}",
+    "description": "${source == 'text' ? question : processedText}",
+    "category": "${aiCategory}",
+    "sub_category": "${subCategory}",
+    "priority": "${aiPriority}",
+    "customer_id": "${customerId}"
+  }
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>taskResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>false</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- JOIN MCP TOOLS -->
+    <parallelGateway id="mcpJoin" name="⚡ Tools Complete"/>
+
+    <sequenceFlow id="flow_cat_join" sourceRef="updateCategory" targetRef="mcpJoin"/>
+    <sequenceFlow id="flow_priority_join" sourceRef="setPriority" targetRef="mcpJoin"/>
+    <sequenceFlow id="flow_task_join" sourceRef="createTask" targetRef="mcpJoin"/>
+
+    <sequenceFlow id="flow_join_routing" sourceRef="mcpJoin" targetRef="priorityRouting"/>
+
+    <!-- ==================== PRIORITY ROUTING ==================== -->
+    <exclusiveGateway id="priorityRouting" name="⚡ Priority Level?"/>
+
+    <sequenceFlow id="urgentFlow" name="URGENT" sourceRef="priorityRouting" targetRef="urgentTask">
+      <conditionExpression xsi:type="tFormalExpression">${aiPriority == 'URGENT'}</conditionExpression>
+    </sequenceFlow>
+
+    <sequenceFlow id="highFlow" name="HIGH" sourceRef="priorityRouting" targetRef="highTask">
+      <conditionExpression xsi:type="tFormalExpression">${aiPriority == 'HIGH'}</conditionExpression>
+    </sequenceFlow>
+
+    <sequenceFlow id="mediumFlow" name="MEDIUM" sourceRef="priorityRouting" targetRef="mediumTask">
+      <conditionExpression xsi:type="tFormalExpression">${aiPriority == 'MEDIUM'}</conditionExpression>
+    </sequenceFlow>
+
+    <sequenceFlow id="lowFlow" name="LOW" sourceRef="priorityRouting" targetRef="lowTask">
+      <conditionExpression xsi:type="tFormalExpression">${aiPriority == 'LOW' || aiPriority != 'URGENT' &amp;&amp; aiPriority != 'HIGH' &amp;&amp; aiPriority != 'MEDIUM'}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- ==================== USER TASKS ==================== -->
+
+    <userTask id="urgentTask" name="🔴 URGENT Task" flowable:candidateGroups="emergency-team">
+      <documentation>
+        URGENT: Immediate action required
+
+        Team: ${assignedTeam}
+        Category: ${aiCategory} → ${subCategory}
+        SLA: ${slaHours} hours
+        Intent: ${intent}
+        Reasoning: ${reasoning}
+      </documentation>
+    </userTask>
+
+    <userTask id="highTask" name="🟠 HIGH Priority Task" flowable:candidateGroups="managers">
+      <documentation>
+        HIGH priority task
+
+        Team: ${assignedTeam}
+        Category: ${aiCategory} → ${subCategory}
+        SLA: ${slaHours} hours
+        Intent: ${intent}
+        Reasoning: ${reasoning}
+      </documentation>
+    </userTask>
+
+    <userTask id="mediumTask" name="🟢 MEDIUM Priority Task" flowable:candidateGroups="support-team">
+      <documentation>
+        MEDIUM priority task
+
+        Team: ${assignedTeam}
+        Category: ${aiCategory} → ${subCategory}
+        SLA: ${slaHours} hours
+        Intent: ${intent}
+        Reasoning: ${reasoning}
+      </documentation>
+    </userTask>
+
+    <userTask id="lowTask" name="🔵 LOW Priority Task" flowable:candidateGroups="support-team">
+      <documentation>
+        LOW priority task
+
+        Team: ${assignedTeam}
+        Category: ${aiCategory} → ${subCategory}
+        SLA: ${slaHours} hours
+        Intent: ${intent}
+        Reasoning: ${reasoning}
+      </documentation>
+    </userTask>
+
+    <!-- JOIN USER TASKS -->
+    <exclusiveGateway id="taskJoin" name="Task Complete"/>
+
+    <sequenceFlow id="flow_urgent_join" sourceRef="urgentTask" targetRef="taskJoin"/>
+    <sequenceFlow id="flow_high_join" sourceRef="highTask" targetRef="taskJoin"/>
+    <sequenceFlow id="flow_medium_join" sourceRef="mediumTask" targetRef="taskJoin"/>
+    <sequenceFlow id="flow_low_join" sourceRef="lowTask" targetRef="taskJoin"/>
+
+    <sequenceFlow id="flow_taskjoin_store" sourceRef="taskJoin" targetRef="storeData"/>
+
+    <!-- ==================== STORE TO VECTOR DB ==================== -->
+    <serviceTask id="storeData" name="💾 Store to Vector DB" flowable:type="http">
+      <extensionElements>
+        <flowable:field name="requestMethod"><flowable:string>POST</flowable:string></flowable:field>
+        <flowable:field name="requestUrl">
+          <flowable:string>http://host.docker.internal:8000/api/microservices/store-vector</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestHeaders">
+          <flowable:string>Content-Type: application/json</flowable:string>
+        </flowable:field>
+        <flowable:field name="requestBody">
+          <flowable:expression><![CDATA[{
+  "text": "${source == 'text' ? question : processedText}",
+  "metadata": {
+    "customer_id": "${customerId}",
+    "category": "${aiCategory}",
+    "sub_category": "${subCategory}",
+    "priority": "${aiPriority}",
+    "assigned_team": "${assignedTeam}",
+    "intent": "${intent}",
+    "source": "${source}"
+  },
+  "collection": "conversations"
+}]]></flowable:expression>
+        </flowable:field>
+        <flowable:field name="responseVariableName"><flowable:string>storeResult</flowable:string></flowable:field>
+        <flowable:field name="saveResponseVariableAsJson"><flowable:string>false</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow_store_end" sourceRef="storeData" targetRef="end"/>
+
+    <!-- ==================== END EVENT ==================== -->
+    <endEvent id="end" name="✅ Process Complete"/>
+
+  </process>
+
+  <error id="processingError" errorCode="PROCESSING_ERROR"/>
+
+  <!-- ========================================== -->
+  <!-- BPMN DIAGRAM LAYOUT -->
+  <!-- ========================================== -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_advancedIntakeProcess">
+    <bpmndi:BPMNPlane bpmnElement="advancedIntakeProcess" id="BPMNPlane_advancedIntakeProcess">
+
+      <!-- START EVENT -->
+      <bpmndi:BPMNShape bpmnElement="start" id="BPMNShape_start">
+        <omgdc:Bounds height="30.0" width="30.0" x="50.0" y="300.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- SOURCE GATEWAY -->
+      <bpmndi:BPMNShape bpmnElement="sourceGateway" id="BPMNShape_sourceGateway">
+        <omgdc:Bounds height="40.0" width="40.0" x="130.0" y="295.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- AUDIO PATH -->
+      <bpmndi:BPMNShape bpmnElement="speechToText" id="BPMNShape_speechToText">
+        <omgdc:Bounds height="60.0" width="100.0" x="220.0" y="180.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="parseTranscription" id="BPMNShape_parseTranscription">
+        <omgdc:Bounds height="60.0" width="100.0" x="370.0" y="180.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- AI PIPELINE - 6 NODES -->
+      <bpmndi:BPMNShape bpmnElement="sentimentAnalysis" id="BPMNShape_sentimentAnalysis">
+        <omgdc:Bounds height="60.0" width="120.0" x="220.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="generateEmbedding" id="BPMNShape_generateEmbedding">
+        <omgdc:Bounds height="60.0" width="120.0" x="380.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="qdrantSearch" id="BPMNShape_qdrantSearch">
+        <omgdc:Bounds height="60.0" width="120.0" x="540.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="rerankResults" id="BPMNShape_rerankResults">
+        <omgdc:Bounds height="60.0" width="120.0" x="700.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="buildRAGContext" id="BPMNShape_buildRAGContext">
+        <omgdc:Bounds height="60.0" width="120.0" x="860.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="geminiLLMCall" id="BPMNShape_geminiLLMCall">
+        <omgdc:Bounds height="60.0" width="140.0" x="1020.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- PARSE LLM RESPONSE -->
+      <bpmndi:BPMNShape bpmnElement="parseLLMResponse" id="BPMNShape_parseLLMResponse">
+        <omgdc:Bounds height="60.0" width="120.0" x="1200.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- SUB-CATEGORIZATION -->
+      <bpmndi:BPMNShape bpmnElement="subCategorization" id="BPMNShape_subCategorization">
+        <omgdc:Bounds height="60.0" width="120.0" x="1360.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="parseSubCat" id="BPMNShape_parseSubCat">
+        <omgdc:Bounds height="60.0" width="120.0" x="1520.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- MCP PARALLEL GATEWAY -->
+      <bpmndi:BPMNShape bpmnElement="mcpParallel" id="BPMNShape_mcpParallel">
+        <omgdc:Bounds height="40.0" width="40.0" x="1680.0" y="295.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- MCP TOOLS - 3 NODES -->
+      <bpmndi:BPMNShape bpmnElement="updateCategory" id="BPMNShape_updateCategory">
+        <omgdc:Bounds height="60.0" width="100.0" x="1760.0" y="180.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="setPriority" id="BPMNShape_setPriority">
+        <omgdc:Bounds height="60.0" width="100.0" x="1760.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="createTask" id="BPMNShape_createTask">
+        <omgdc:Bounds height="60.0" width="100.0" x="1760.0" y="390.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- MCP JOIN GATEWAY -->
+      <bpmndi:BPMNShape bpmnElement="mcpJoin" id="BPMNShape_mcpJoin">
+        <omgdc:Bounds height="40.0" width="40.0" x="1900.0" y="295.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- PRIORITY ROUTING GATEWAY -->
+      <bpmndi:BPMNShape bpmnElement="priorityRouting" id="BPMNShape_priorityRouting">
+        <omgdc:Bounds height="40.0" width="40.0" x="1980.0" y="295.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- USER TASKS - 4 PRIORITY LEVELS -->
+      <bpmndi:BPMNShape bpmnElement="urgentTask" id="BPMNShape_urgentTask">
+        <omgdc:Bounds height="60.0" width="120.0" x="2060.0" y="120.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="highTask" id="BPMNShape_highTask">
+        <omgdc:Bounds height="60.0" width="120.0" x="2060.0" y="220.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="mediumTask" id="BPMNShape_mediumTask">
+        <omgdc:Bounds height="60.0" width="120.0" x="2060.0" y="320.0"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape bpmnElement="lowTask" id="BPMNShape_lowTask">
+        <omgdc:Bounds height="60.0" width="120.0" x="2060.0" y="420.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- TASK JOIN GATEWAY -->
+      <bpmndi:BPMNShape bpmnElement="taskJoin" id="BPMNShape_taskJoin">
+        <omgdc:Bounds height="40.0" width="40.0" x="2220.0" y="295.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- STORE DATA -->
+      <bpmndi:BPMNShape bpmnElement="storeData" id="BPMNShape_storeData">
+        <omgdc:Bounds height="60.0" width="120.0" x="2300.0" y="285.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- END EVENT -->
+      <bpmndi:BPMNShape bpmnElement="end" id="BPMNShape_end">
+        <omgdc:Bounds height="30.0" width="30.0" x="2460.0" y="300.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- ========================================== -->
+      <!-- EDGES / SEQUENCE FLOWS -->
+      <!-- ========================================== -->
+
+      <!-- START -> SOURCE GATEWAY -->
+      <bpmndi:BPMNEdge bpmnElement="flow_start" id="BPMNEdge_flow_start">
+        <omgdi:waypoint x="80.0" y="315.0"/>
+        <omgdi:waypoint x="130.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- SOURCE GATEWAY -> AUDIO PATH -->
+      <bpmndi:BPMNEdge bpmnElement="audioPath" id="BPMNEdge_audioPath">
+        <omgdi:waypoint x="150.0" y="295.0"/>
+        <omgdi:waypoint x="150.0" y="210.0"/>
+        <omgdi:waypoint x="220.0" y="210.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- SOURCE GATEWAY -> TEXT PATH (SENTIMENT) -->
+      <bpmndi:BPMNEdge bpmnElement="textPath" id="BPMNEdge_textPath">
+        <omgdi:waypoint x="170.0" y="315.0"/>
+        <omgdi:waypoint x="220.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- SPEECH TO TEXT -> PARSE TRANSCRIPTION -->
+      <bpmndi:BPMNEdge bpmnElement="flow_stt_parse" id="BPMNEdge_flow_stt_parse">
+        <omgdi:waypoint x="320.0" y="210.0"/>
+        <omgdi:waypoint x="370.0" y="210.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- PARSE TRANSCRIPTION -> SENTIMENT -->
+      <bpmndi:BPMNEdge bpmnElement="flow_parse_sentiment" id="BPMNEdge_flow_parse_sentiment">
+        <omgdi:waypoint x="420.0" y="240.0"/>
+        <omgdi:waypoint x="420.0" y="262.0"/>
+        <omgdi:waypoint x="280.0" y="262.0"/>
+        <omgdi:waypoint x="280.0" y="285.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- AI PIPELINE EDGES -->
+      <bpmndi:BPMNEdge bpmnElement="flow_sentiment_embedding" id="BPMNEdge_flow_sentiment_embedding">
+        <omgdi:waypoint x="340.0" y="315.0"/>
+        <omgdi:waypoint x="380.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_embedding_search" id="BPMNEdge_flow_embedding_search">
+        <omgdi:waypoint x="500.0" y="315.0"/>
+        <omgdi:waypoint x="540.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_search_rerank" id="BPMNEdge_flow_search_rerank">
+        <omgdi:waypoint x="660.0" y="315.0"/>
+        <omgdi:waypoint x="700.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_rerank_context" id="BPMNEdge_flow_rerank_context">
+        <omgdi:waypoint x="820.0" y="315.0"/>
+        <omgdi:waypoint x="860.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_context_llm" id="BPMNEdge_flow_context_llm">
+        <omgdi:waypoint x="980.0" y="315.0"/>
+        <omgdi:waypoint x="1020.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- LLM -> PARSE LLM -->
+      <bpmndi:BPMNEdge bpmnElement="flow_llm_parse" id="BPMNEdge_flow_llm_parse">
+        <omgdi:waypoint x="1160.0" y="315.0"/>
+        <omgdi:waypoint x="1200.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- PARSE LLM -> SUB-CATEGORIZATION -->
+      <bpmndi:BPMNEdge bpmnElement="flow_parse_subcat" id="BPMNEdge_flow_parse_subcat">
+        <omgdi:waypoint x="1320.0" y="315.0"/>
+        <omgdi:waypoint x="1360.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- SUB-CAT -> PARSE SUB-CAT -->
+      <bpmndi:BPMNEdge bpmnElement="flow_subcat_parse" id="BPMNEdge_flow_subcat_parse">
+        <omgdi:waypoint x="1480.0" y="315.0"/>
+        <omgdi:waypoint x="1520.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- PARSE SUB-CAT -> MCP PARALLEL -->
+      <bpmndi:BPMNEdge bpmnElement="flow_parsesubcat_mcpparallel" id="BPMNEdge_flow_parsesubcat_mcpparallel">
+        <omgdi:waypoint x="1640.0" y="315.0"/>
+        <omgdi:waypoint x="1680.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- MCP PARALLEL -> TOOLS -->
+      <bpmndi:BPMNEdge bpmnElement="flow_mcp_updatecat" id="BPMNEdge_flow_mcp_updatecat">
+        <omgdi:waypoint x="1700.0" y="295.0"/>
+        <omgdi:waypoint x="1700.0" y="210.0"/>
+        <omgdi:waypoint x="1760.0" y="210.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_mcp_setpriority" id="BPMNEdge_flow_mcp_setpriority">
+        <omgdi:waypoint x="1720.0" y="315.0"/>
+        <omgdi:waypoint x="1760.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_mcp_createtask" id="BPMNEdge_flow_mcp_createtask">
+        <omgdi:waypoint x="1700.0" y="335.0"/>
+        <omgdi:waypoint x="1700.0" y="420.0"/>
+        <omgdi:waypoint x="1760.0" y="420.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- TOOLS -> MCP JOIN -->
+      <bpmndi:BPMNEdge bpmnElement="flow_cat_join" id="BPMNEdge_flow_cat_join">
+        <omgdi:waypoint x="1860.0" y="210.0"/>
+        <omgdi:waypoint x="1920.0" y="210.0"/>
+        <omgdi:waypoint x="1920.0" y="295.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_priority_join" id="BPMNEdge_flow_priority_join">
+        <omgdi:waypoint x="1860.0" y="315.0"/>
+        <omgdi:waypoint x="1900.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_task_join" id="BPMNEdge_flow_task_join">
+        <omgdi:waypoint x="1860.0" y="420.0"/>
+        <omgdi:waypoint x="1920.0" y="420.0"/>
+        <omgdi:waypoint x="1920.0" y="335.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- MCP JOIN -> PRIORITY ROUTING -->
+      <bpmndi:BPMNEdge bpmnElement="flow_join_routing" id="BPMNEdge_flow_join_routing">
+        <omgdi:waypoint x="1940.0" y="315.0"/>
+        <omgdi:waypoint x="1980.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- PRIORITY ROUTING -> USER TASKS -->
+      <bpmndi:BPMNEdge bpmnElement="urgentFlow" id="BPMNEdge_urgentFlow">
+        <omgdi:waypoint x="2000.0" y="295.0"/>
+        <omgdi:waypoint x="2000.0" y="150.0"/>
+        <omgdi:waypoint x="2060.0" y="150.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="highFlow" id="BPMNEdge_highFlow">
+        <omgdi:waypoint x="2000.0" y="295.0"/>
+        <omgdi:waypoint x="2000.0" y="250.0"/>
+        <omgdi:waypoint x="2060.0" y="250.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="mediumFlow" id="BPMNEdge_mediumFlow">
+        <omgdi:waypoint x="2000.0" y="335.0"/>
+        <omgdi:waypoint x="2000.0" y="350.0"/>
+        <omgdi:waypoint x="2060.0" y="350.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="lowFlow" id="BPMNEdge_lowFlow">
+        <omgdi:waypoint x="2000.0" y="335.0"/>
+        <omgdi:waypoint x="2000.0" y="450.0"/>
+        <omgdi:waypoint x="2060.0" y="450.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- USER TASKS -> TASK JOIN -->
+      <bpmndi:BPMNEdge bpmnElement="flow_urgent_join" id="BPMNEdge_flow_urgent_join">
+        <omgdi:waypoint x="2180.0" y="150.0"/>
+        <omgdi:waypoint x="2240.0" y="150.0"/>
+        <omgdi:waypoint x="2240.0" y="295.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_high_join" id="BPMNEdge_flow_high_join">
+        <omgdi:waypoint x="2180.0" y="250.0"/>
+        <omgdi:waypoint x="2240.0" y="250.0"/>
+        <omgdi:waypoint x="2240.0" y="295.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_medium_join" id="BPMNEdge_flow_medium_join">
+        <omgdi:waypoint x="2180.0" y="350.0"/>
+        <omgdi:waypoint x="2240.0" y="350.0"/>
+        <omgdi:waypoint x="2240.0" y="335.0"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge bpmnElement="flow_low_join" id="BPMNEdge_flow_low_join">
+        <omgdi:waypoint x="2180.0" y="450.0"/>
+        <omgdi:waypoint x="2240.0" y="450.0"/>
+        <omgdi:waypoint x="2240.0" y="335.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- TASK JOIN -> STORE DATA -->
+      <bpmndi:BPMNEdge bpmnElement="flow_taskjoin_store" id="BPMNEdge_flow_taskjoin_store">
+        <omgdi:waypoint x="2260.0" y="315.0"/>
+        <omgdi:waypoint x="2300.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+      <!-- STORE DATA -> END -->
+      <bpmndi:BPMNEdge bpmnElement="flow_store_end" id="BPMNEdge_flow_store_end">
+        <omgdi:waypoint x="2420.0" y="315.0"/>
+        <omgdi:waypoint x="2460.0" y="315.0"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</definitions>

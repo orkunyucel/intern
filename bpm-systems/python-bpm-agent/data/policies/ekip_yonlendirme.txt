@@ -1,0 +1,56 @@
+# Ekip Yönlendirme Kuralları
+
+## TechTeam (Teknik Destek Ekibi)
+**Sorumluluk Alanları:**
+- İnternet bağlantı sorunları
+- Modem/Router arızaları
+- Ağ konfigürasyonu
+- Hız testleri ve optimizasyon
+- Altyapı sorunları
+
+**Çalışma Saatleri:** 7/24
+**SLA:** URGENT: 1 saat, HIGH: 4 saat, MEDIUM: 12 saat
+
+## BillingTeam (Fatura Ekibi)
+**Sorumluluk Alanları:**
+- Fatura itirazları
+- Ödeme sorunları
+- Tarife değişiklikleri
+- İptal işlemleri
+- Ücret iadesi onayları
+
+**Çalışma Saatleri:** Hafta içi 09:00-18:00
+**SLA:** URGENT: 2 saat, HIGH: 8 saat, MEDIUM: 24 saat
+
+## HRTeam (İnsan Kaynakları)
+**Sorumluluk Alanları:**
+- Personel talepleri
+- İzin yönetimi
+- Bordro soruları
+- Eğitim ve gelişim
+- Yan haklar
+
+**Çalışma Saatleri:** Hafta içi 09:00-17:00
+**SLA:** HIGH: 24 saat, MEDIUM: 48 saat, LOW: 72 saat
+
+## CustomerCare (Müşteri Hizmetleri)
+**Sorumluluk Alanları:**
+- Genel bilgilendirme
+- Şikayet yönetimi
+- Öneri değerlendirme
+- Kategori dışı talepler
+- İlk seviye destek
+
+**Çalışma Saatleri:** 7/24
+**SLA:** URGENT: 30 dakika, HIGH: 2 saat, MEDIUM: 6 saat
+
+## Eskalasyon Kuralları
+1. Teknik sorun 24 saat içinde çözülmezse → TechTeam Lead'e eskalasyon
+2. Fatura itirazı 1000 TL üzeri → BillingTeam Manager onayı
+3. Müşteri 3 kez aynı sorunla dönerse → CustomerCare Manager bilgilendirme
+4. VIP müşteri talebi → İlgili ekip lead'i direkt assign
+
+## Çapraz Ekip Durumlar
+- İnternet + Fatura sorunu → TechTeam ana görev, BillingTeam bilgilendirilir
+- Teknik + Şikayet → TechTeam + CustomerCare koordinasyon
+- Acil durum mesai dışı → Nöbetçi ekip devreye girer

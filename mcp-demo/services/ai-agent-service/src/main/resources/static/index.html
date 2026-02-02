@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP + CAMARA Architecture Flow</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --card: #12121a;
+            --border: #2a2a3a;
+            --text: #e0e0e0;
+            --dim: #888;
+            --accent: #6366f1;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .header .status {
+            font-size: 0.8rem;
+            color: var(--dim);
+        }
+
+        .input-section {
+            max-width: 600px;
+            margin: 0 auto 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-section input {
+            flex: 1;
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        .input-section button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+        }
+
+        .input-section button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .flow-container {
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            gap: 8px;
+            max-width: 1400px;
+            margin: 0 auto 30px;
+            min-height: 180px;
+        }
+
+        .component {
+            flex: 1;
+            max-width: 200px;
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .component.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .component.done {
+            border-color: var(--success);
+        }
+
+        .component .name {
+            font-size: 0.7rem;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .component .port {
+            font-size: 0.65rem;
+            color: var(--warning);
+            margin-bottom: 8px;
+        }
+
+        .component .data {
+            flex: 1;
+            font-size: 0.75rem;
+            color: var(--text);
+            word-break: break-word;
+            overflow-y: auto;
+            max-height: 100px;
+        }
+
+        .component .step-indicator {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .component.active .step-indicator {
+            opacity: 1;
+        }
+
+        .arrow {
+            display: flex;
+            align-items: center;
+            color: var(--dim);
+            font-size: 1.2rem;
+        }
+
+        .arrow.active {
+            color: var(--accent);
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .steps-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .steps-container h3 {
+            font-size: 0.9rem;
+            color: var(--dim);
+            margin-bottom: 16px;
+        }
+
+        .steps-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .step-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            font-size: 0.8rem;
+            border-left: 3px solid var(--border);
+        }
+
+        .step-item.in-progress {
+            border-left-color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .step-item.completed {
+            border-left-color: var(--success);
+        }
+
+        .step-item .step-num {
+            color: var(--accent);
+            font-weight: bold;
+            min-width: 30px;
+        }
+
+        .step-item .step-from,
+        .step-item .step-to {
+            color: var(--warning);
+            min-width: 80px;
+        }
+
+        .step-item .step-data {
+            flex: 1;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--dim);
+            padding: 40px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>MCP + CAMARA Architecture Flow</h1>
+        <div class="status" id="connectionStatus">Ready</div>
+    </div>
+
+    <div class="input-section">
+        <input type="text" id="questionInput" placeholder="Enter your request (e.g., 'bandwidth 700 yap')">
+        <button id="runBtn" onclick="runAgent()">Run</button>
+    </div>
+
+    <div class="flow-container" id="flowContainer"></div>
+
+    <div class="steps-container">
+        <h3>Execution Flow (Real-time)</h3>
+        <div class="steps-list" id="stepsList">
+            <div class="empty-state">Enter a request to see the execution flow</div>
+        </div>
+    </div>
+
+    <script>
+        const COMPONENTS = [
+            { id: 'user', name: 'USER', port: 'You' },
+            { id: 'agent', name: 'AI AGENT', port: '8081' },
+            { id: 'llm', name: 'LLM', port: 'Gemini' },
+            { id: 'mcp', name: 'MCP SERVER', port: '8083' },
+            { id: 'camara', name: 'CAMARA API', port: '8084' },
+            { id: 'network', name: 'NETWORK', port: '8085' }
+        ];
+
+        let currentStep = 0;
+        let eventSource = null;
+        let activeTaskId = null;
+
+        function initUI() {
+            const container = document.getElementById('flowContainer');
+            container.innerHTML = '';
+            COMPONENTS.forEach((comp, i) => {
+                const div = document.createElement('div');
+                div.className = 'component';
+                div.id = `comp-${comp.id}`;
+                div.innerHTML = `
+                    <div class="name">${comp.name}</div>
+                    <div class="port">${comp.port}</div>
+                    <div class="data" id="data-${comp.id}">-</div>
+                    <div class="step-indicator" id="step-${comp.id}"></div>
+                `;
+                container.appendChild(div);
+                if (i < COMPONENTS.length - 1) {
+                    const arrow = document.createElement('div');
+                    arrow.className = 'arrow';
+                    arrow.id = `arrow-${i}`;
+                    arrow.innerHTML = '→';
+                    container.appendChild(arrow);
+                }
+            });
+        }
+
+        function updateComponentData(id, data) {
+            const el = document.getElementById(`data-${id}`);
+            if (el) el.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+        }
+
+        function setActiveComponent(id, stepNum) {
+            document.querySelectorAll('.component').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.arrow').forEach(a => a.classList.remove('active'));
+            const comp = document.getElementById(`comp-${id}`);
+            if (comp) {
+                comp.classList.add('active');
+                document.getElementById(`step-${id}`).textContent = stepNum;
+            }
+            const compIndex = COMPONENTS.findIndex(c => c.id === id);
+            for (let i = 0; i < compIndex; i++) {
+                const arrow = document.getElementById(`arrow-${i}`);
+                if (arrow) arrow.classList.add('active');
+            }
+        }
+
+        function addStep(stepNum, from, to, data) {
+            const list = document.getElementById('stepsList');
+            if (stepNum === 1) list.innerHTML = '';
+            const item = document.createElement('div');
+            item.className = 'step-item in-progress';
+            item.id = `step-item-${stepNum}`;
+            item.innerHTML = `
+                <span class="step-num">⑨ ${stepNum}</span>
+                <span class="step-from">${from}</span>
+                <span>→</span>
+                <span class="step-to">${to}</span>
+                <span class="step-data">${typeof data === 'object' ? JSON.stringify(data) : data}</span>
+            `;
+            list.appendChild(item);
+            list.scrollTop = list.scrollHeight;
+        }
+
+        function completeStep(stepNum) {
+            const item = document.getElementById(`step-item-${stepNum}`);
+            if (item) { item.classList.remove('in-progress'); item.classList.add('completed'); }
+        }
+
+        function checkTextForTaskId(text) {
+            const match = text && typeof text === 'string' && text.match(/Task ID:\s*([a-f0-9-]{36})/i);
+            if (match && match[1]) {
+                activeTaskId = match[1];
+                subscribeToTask(activeTaskId);
+            }
+        }
+
+        function subscribeToTask(taskId) {
+            const taskSource = new EventSource(`http://localhost:8083/mcp/tasks/${taskId}/subscribe`);
+            taskSource.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                currentStep++;
+                setActiveComponent('network', currentStep);
+                updateComponentData('network', data);
+                addStep(currentStep, 'NETWORK', 'MCP', JSON.stringify(data));
+                if (data.status === 'AVAILABLE' || data.status === 'FAILED') {
+                    taskSource.close();
+                    document.getElementById('connectionStatus').textContent = 'Completed (Async)';
+                    document.querySelectorAll('.component').forEach(c => { c.classList.remove('active'); c.classList.add('done'); });
+                    document.getElementById('runBtn').disabled = false;
+                    activeTaskId = null;
+                }
+            };
+            taskSource.onerror = () => console.error("Task SSE Error");
+        }
+
+        async function runAgent() {
+            const input = document.getElementById('questionInput');
+            const btn = document.getElementById('runBtn');
+            const question = input.value.trim();
+            if (!question) return;
+
+            btn.disabled = true;
+            currentStep = 0;
+            activeTaskId = null;
+            document.getElementById('stepsList').innerHTML = '';
+            document.querySelectorAll('.component').forEach(c => c.classList.remove('active', 'done'));
+            COMPONENTS.forEach(c => updateComponentData(c.id, '-'));
+
+            currentStep++;
+            setActiveComponent('user', currentStep);
+            updateComponentData('user', question);
+            addStep(currentStep, 'USER', 'AGENT', question);
+
+            eventSource = new EventSource(`/api/agent/run?question=${encodeURIComponent(question)}&includeStatus=true`);
+
+            eventSource.onopen = () => {
+                document.getElementById('connectionStatus').textContent = 'Connected (SSE)';
+                completeStep(1);
+            };
+
+            // ALL STEPS - show raw JSON data
+            eventSource.addEventListener('step', (e) => {
+                const data = JSON.parse(e.data);
+                currentStep++;
+
+                if (data.type === 'TOOL_DISCOVERY') {
+                    setActiveComponent('mcp', currentStep);
+                    updateComponentData('mcp', data);
+                    addStep(currentStep, 'AGENT', 'MCP', JSON.stringify(data));
+                } else if (data.type === 'PROMPT') {
+                    setActiveComponent('llm', currentStep);
+                    updateComponentData('llm', data);
+                    addStep(currentStep, 'AGENT', 'LLM', JSON.stringify(data));
+                } else if (data.type === 'LLM_TOOL_CALL') {
+                    setActiveComponent('llm', currentStep);
+                    updateComponentData('llm', data);
+                    addStep(currentStep, 'LLM', 'AGENT', JSON.stringify(data));
+                } else if (data.type === 'FINAL_RESPONSE') {
+                    setActiveComponent('agent', currentStep);
+                    updateComponentData('agent', data);
+                    addStep(currentStep, 'LLM', 'AGENT', JSON.stringify(data));
+                } else {
+                    setActiveComponent('agent', currentStep);
+                    updateComponentData('agent', data);
+                    addStep(currentStep, 'AGENT', 'MCP', JSON.stringify(data));
+                }
+            });
+
+            eventSource.addEventListener('tool-call', (e) => {
+                const data = JSON.parse(e.data);
+                currentStep++;
+                completeStep(currentStep - 1);
+                setActiveComponent('llm', currentStep);
+                updateComponentData('llm', data);
+                addStep(currentStep, 'LLM', 'MCP', JSON.stringify(data));
+
+                currentStep++;
+                setActiveComponent('mcp', currentStep);
+                updateComponentData('mcp', data);
+                addStep(currentStep, 'MCP', 'CAMARA', JSON.stringify(data));
+
+                currentStep++;
+                setActiveComponent('camara', currentStep);
+                updateComponentData('camara', data.arguments || data.args || data);
+                addStep(currentStep, 'CAMARA', 'NETWORK', JSON.stringify(data.arguments || data.args || data));
+            });
+
+            eventSource.addEventListener('tool-result', (e) => {
+                const data = JSON.parse(e.data);
+                const resultText = data.result || data.data || JSON.stringify(data);
+                checkTextForTaskId(resultText);
+
+                currentStep++;
+                completeStep(currentStep - 1);
+                setActiveComponent('network', currentStep);
+                updateComponentData('network', data);
+                addStep(currentStep, 'NETWORK', 'CAMARA', JSON.stringify(data));
+
+                currentStep++;
+                setActiveComponent('camara', currentStep);
+                updateComponentData('camara', data);
+                addStep(currentStep, 'CAMARA', 'MCP', JSON.stringify(data));
+
+                currentStep++;
+                setActiveComponent('mcp', currentStep);
+                addStep(currentStep, 'MCP', 'AGENT', JSON.stringify(data));
+            });
+
+            eventSource.addEventListener('llm-response', (e) => {
+                const data = JSON.parse(e.data);
+                currentStep++;
+                completeStep(currentStep - 1);
+                setActiveComponent('llm', currentStep);
+                updateComponentData('llm', data);
+                addStep(currentStep, 'LLM', 'AGENT', JSON.stringify(data));
+            });
+
+            eventSource.addEventListener('final-response', (e) => {
+                const data = JSON.parse(e.data);
+                const response = data.response || data.data || JSON.stringify(data);
+                checkTextForTaskId(response);
+                currentStep++;
+                completeStep(currentStep - 1);
+                setActiveComponent('user', currentStep);
+                updateComponentData('agent', data);
+                updateComponentData('user', 'Received response');
+                addStep(currentStep, 'AGENT', 'USER', JSON.stringify(data));
+            });
+
+            eventSource.addEventListener('error-event', (e) => {
+                const data = JSON.parse(e.data);
+                currentStep++;
+                addStep(currentStep, 'ERROR', 'AGENT', JSON.stringify(data));
+            });
+
+            eventSource.addEventListener('done', () => {
+                eventSource.close();
+                if (activeTaskId) {
+                    document.getElementById('connectionStatus').textContent = 'Waiting for Async Notification...';
+                } else {
+                    btn.disabled = false;
+                    document.getElementById('connectionStatus').textContent = 'Completed';
+                    document.querySelectorAll('.component').forEach(c => { c.classList.remove('active'); c.classList.add('done'); });
+                }
+            });
+
+            eventSource.onerror = () => {
+                eventSource.close();
+                if (!activeTaskId) btn.disabled = false;
+                document.getElementById('connectionStatus').textContent = activeTaskId ? 'Waiting for Async...' : 'Disconnected';
+            };
+        }
+
+        document.getElementById('questionInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') runAgent(); });
+        initUI();
+    </script>
+</body>
+
+</html>

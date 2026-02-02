@@ -1,0 +1,32 @@
+# Kategori Belirleme Kuralları
+
+## TECH_SUPPORT
+- İnternet kesintisi, bağlantı sorunları
+- Modem, router arızaları
+- Hız düşüklüğü, yavaş internet
+- Wi-Fi bağlantı problemleri
+- Ağ erişim sorunları
+
+## BILLING
+- Fatura itirazları
+- Ödeme sorunları
+- Tarife değişikliği talepleri
+- Abonelik iptali
+- Ücret iadesi talepleri
+- Eksik/fazla tahsilat şikayetleri
+
+## HR
+- İzin talepleri
+- Bordro soruları
+- Yan haklar, sigorta
+- Eğitim talepleri
+- Performans değerlendirme
+
+## GENERAL
+- Genel bilgi talepleri
+- Öneri ve şikayetler
+- Diğer kategorilere girmeyen talepler
+
+## Özel Durumlar
+- Birden fazla konu içeren talepler: Ağırlıklı olana göre kategori belirle
+- Belirsiz talepler: GENERAL kategorisi kullan, eksik bilgi iste

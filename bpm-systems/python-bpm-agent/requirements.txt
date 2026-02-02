@@ -1,0 +1,34 @@
+# FastAPI ve Server
+fastapi==0.109.0
+uvicorn==0.27.0
+pydantic>=2.7.4
+pydantic-settings>=2.4.0
+
+# Qdrant Vector DB
+qdrant-client==1.7.0
+
+# Google Gemini API
+google-generativeai>=0.8.0
+
+# Utilities
+python-dotenv==1.0.0
+requests==2.31.0
+httpx==0.26.0
+python-multipart==0.0.6
+
+# Speech-to-Text
+gtts==2.5.4
+openai-whisper==20231117
+
+# LangChain & LangGraph
+langchain==0.3.13
+langchain-core==0.3.28
+langchain-community==0.3.13
+langchain-google-genai==2.0.8
+langgraph==0.2.60
+langsmith==0.2.8
+
+# PDF Processing
+pypdf==5.1.0
+pdf2image==1.17.0
+pdfplumber==0.11.4
