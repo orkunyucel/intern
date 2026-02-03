@@ -67,12 +67,14 @@ def get_tools_from_mcp():
     Returns:
         list: Tool tanımları listesi
     """
-    response = requests.post(f'{MCP_SERVER}/rpc', json={
+    request_payload = {
         "jsonrpc": "2.0",
         "method": "tools/list",
         "id": get_next_request_id()
-    }, timeout=10)
-    return response.json().get('result', {}).get('tools', [])
+    }
+    response = requests.post(f'{MCP_SERVER}/rpc', json=request_payload, timeout=10)
+    response_json = response.json()
+    return response_json.get('result', {}).get('tools', []), request_payload, response_json
 
 
 def execute_tool(tool_name, arguments):
@@ -94,8 +96,7 @@ def execute_tool(tool_name, arguments):
         dict: taskId ve status içeren result
     """
 
-    response = requests.post(f'{MCP_SERVER}/rpc', 
-    json={
+    request_payload = {
         "jsonrpc": "2.0",
         "method": "tools/call",
         "params": {
@@ -103,8 +104,10 @@ def execute_tool(tool_name, arguments):
             "arguments": arguments
         },
         "id": get_next_request_id()
-    }, timeout=15)
-    return response.json().get('result', {})
+    }
+    response = requests.post(f'{MCP_SERVER}/rpc', json=request_payload, timeout=15)
+    response_json = response.json()
+    return response_json.get('result', {}), request_payload, response_json
 
 
 def check_user_intent(user_message, pending_offer):
@@ -251,7 +254,7 @@ def chat():
         action = pending_actions.pop(session_id)
 
         # JSON-RPC ile tools/call
-        result = execute_tool(action['tool'], action['parameters'])
+        result, mcp_call_request, mcp_call_response = execute_tool(action['tool'], action['parameters'])
 
         return jsonify({
             'type': 'executing',
@@ -259,7 +262,9 @@ def chat():
             'confirmed_action': f"{action['tool']} onaylandı",
             'tool': action['tool'],
             'taskId': result.get('taskId'),
-            'sseUrl': f'http://localhost:5003/sse/{result.get("taskId")}'
+            'sseUrl': f'http://localhost:5003/sse/{result.get("taskId")}',
+            'mcp_tool_call_request': mcp_call_request,
+            'mcp_tool_call_response': mcp_call_response
         })
 
     # =========================================================================
@@ -278,7 +283,7 @@ def chat():
 
     # JSON-RPC ile tools/list
     try:
-        tools = get_tools_from_mcp()
+        tools, mcp_tools_list_request, mcp_tools_list_response = get_tools_from_mcp()
     except Exception:
         return jsonify({
             'type': 'message',
@@ -289,6 +294,8 @@ def chat():
 
     response_data = {
         'tools_obtained': tools,
+        'mcp_tools_list_request': mcp_tools_list_request,
+        'mcp_tools_list_response': mcp_tools_list_response,
         'llm_input': llm_response.get('_prompt'),
         'llm_raw_response': llm_response.get('_raw_response'),
         'llm_reasoning': llm_response.get('reasoning'),
@@ -307,12 +314,14 @@ def chat():
 
     if selected_tool in READ_TOOLS:
         # JSON-RPC ile tools/call - READ tool direkt execute
-        result = execute_tool(selected_tool, parameters)
+        result, mcp_call_request, mcp_call_response = execute_tool(selected_tool, parameters)
 
         response_data['type'] = 'executing'
         response_data['tool'] = selected_tool
         response_data['taskId'] = result.get('taskId')
         response_data['sseUrl'] = f'http://localhost:5003/sse/{result.get("taskId")}'
+        response_data['mcp_tool_call_request'] = mcp_call_request
+        response_data['mcp_tool_call_response'] = mcp_call_response
         return jsonify(response_data)
 
     # WRITE tool - Kullanıcıya offer sun

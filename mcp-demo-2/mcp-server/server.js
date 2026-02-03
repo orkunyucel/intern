@@ -279,13 +279,28 @@ async function executeToolAsync(taskId, toolName, args) {
       await sleep(1500);
 
       // ⑨ CAMARA API'ye istek gönderiliyor
+      const camaraRequestBody = {
+        // CAMARA CreateSession schema
+        device: MOCK_DEVICE,                    // POC için sabit device
+        applicationServer: MOCK_APPLICATION_SERVER,  // POC için sabit backend IP
+        qosProfile: args.qosProfile,
+        duration: args.duration || 3600,
+        sink: `http://localhost:${PORT}/notify/${taskId}`  // Callback URL (CAMARA formatı)
+      };
+
       sendSSE(taskId, {
         type: 'update',
         status: 'WORKING',
         step: '1.5',
         message: `CAMARA API çağrısı yapılıyor: POST /sessions (QoS: ${args.qosProfile})`,
         // userMessage YOK - bu sadece Admin Panel için
-        apiCall: 'CAMARA_CREATE_SESSION'
+        apiCall: 'CAMARA_CREATE_SESSION',
+        camaraRequest: {
+          method: 'POST',
+          url: `${CAMARA_API}/sessions`,
+          headers: { 'Content-Type': 'application/json' },
+          body: camaraRequestBody
+        }
       });
 
       await sleep(500);
@@ -294,21 +309,16 @@ async function executeToolAsync(taskId, toolName, args) {
       const response = await fetch(`${CAMARA_API}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // CAMARA CreateSession schema
-          device: MOCK_DEVICE,                    // POC için sabit device
-          applicationServer: MOCK_APPLICATION_SERVER,  // POC için sabit backend IP
-          qosProfile: args.qosProfile,
-          duration: args.duration || 3600,
-          sink: `http://localhost:${PORT}/notify/${taskId}`  // Callback URL (CAMARA formatı)
-        })
+        body: JSON.stringify(camaraRequestBody)
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         sendSSE(taskId, {
           type: 'error',
-          message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`
+          message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`,
+          camaraStatus: response.status,
+          camaraError: errorText
         });
         return;
       }
@@ -323,7 +333,9 @@ async function executeToolAsync(taskId, toolName, args) {
         message: `CAMARA API yanıtı: 201 Created (sessionId: ${data.sessionId})`,
         // userMessage YOK - bu sadece Admin Panel için
         apiResponse: 'CAMARA_201_CREATED',
-        sessionId: data.sessionId
+        sessionId: data.sessionId,
+        camaraStatus: response.status,
+        camaraResponse: data
       });
 
       const task = tasks.get(taskId);
@@ -352,9 +364,20 @@ async function executeToolAsync(taskId, toolName, args) {
   // GET QOS STATUS
   else if (toolName === 'get_qos_status') {
     try {
-      const response = await fetch(`${CAMARA_API}/sessions/${args.sessionId}`);
+      const camaraUrl = `${CAMARA_API}/sessions/${args.sessionId}`;
+      const response = await fetch(camaraUrl);
 
       if (response.status === 404) {
+        const errorText = await response.text();
+        sendSSE(taskId, {
+          type: 'update',
+          status: 'WORKING',
+          step: 'status',
+          message: `CAMARA API yanıtı: 404 Not Found (sessionId: ${args.sessionId})`,
+          camaraRequest: { method: 'GET', url: camaraUrl },
+          camaraStatus: response.status,
+          camaraResponseText: errorText
+        });
         sendSSE(taskId, {
           type: 'complete',
           status: 'SUCCESS',
@@ -365,11 +388,29 @@ async function executeToolAsync(taskId, toolName, args) {
       } else if (!response.ok) {
         const errorText = await response.text();
         sendSSE(taskId, {
+          type: 'update',
+          status: 'WORKING',
+          step: 'status',
+          message: `CAMARA API hata: ${response.status} ${response.statusText}`,
+          camaraRequest: { method: 'GET', url: camaraUrl },
+          camaraStatus: response.status,
+          camaraResponseText: errorText
+        });
+        sendSSE(taskId, {
           type: 'error',
           message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`
         });
       } else {
         const data = await response.json();
+        sendSSE(taskId, {
+          type: 'update',
+          status: 'WORKING',
+          step: 'status',
+          message: `CAMARA API yanıtı: ${response.status} OK`,
+          camaraRequest: { method: 'GET', url: camaraUrl },
+          camaraStatus: response.status,
+          camaraResponse: data
+        });
         const statusText = data.qosStatus === 'AVAILABLE' ? 'aktif' : 'işleniyor';
         sendSSE(taskId, {
           type: 'complete',
@@ -387,11 +428,22 @@ async function executeToolAsync(taskId, toolName, args) {
   // DELETE QOS SESSION
   else if (toolName === 'delete_qos_session') {
     try {
-      const response = await fetch(`${CAMARA_API}/sessions/${args.sessionId}`, {
+      const camaraUrl = `${CAMARA_API}/sessions/${args.sessionId}`;
+      const response = await fetch(camaraUrl, {
         method: 'DELETE'
       });
 
       if (response.status === 404) {
+        const errorText = await response.text();
+        sendSSE(taskId, {
+          type: 'update',
+          status: 'WORKING',
+          step: 'delete',
+          message: `CAMARA API yanıtı: 404 Not Found (sessionId: ${args.sessionId})`,
+          camaraRequest: { method: 'DELETE', url: camaraUrl },
+          camaraStatus: response.status,
+          camaraResponseText: errorText
+        });
         sendSSE(taskId, {
           type: 'complete',
           status: 'SUCCESS',
@@ -402,10 +454,27 @@ async function executeToolAsync(taskId, toolName, args) {
       } else if (!response.ok && response.status !== 204) {
         const errorText = await response.text();
         sendSSE(taskId, {
+          type: 'update',
+          status: 'WORKING',
+          step: 'delete',
+          message: `CAMARA API hata: ${response.status} ${response.statusText}`,
+          camaraRequest: { method: 'DELETE', url: camaraUrl },
+          camaraStatus: response.status,
+          camaraResponseText: errorText
+        });
+        sendSSE(taskId, {
           type: 'error',
           message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`
         });
       } else {
+        sendSSE(taskId, {
+          type: 'update',
+          status: 'WORKING',
+          step: 'delete',
+          message: `CAMARA API yanıtı: ${response.status} No Content`,
+          camaraRequest: { method: 'DELETE', url: camaraUrl },
+          camaraStatus: response.status
+        });
         sendSSE(taskId, {
           type: 'complete',
           status: 'SUCCESS',
@@ -423,10 +492,20 @@ async function executeToolAsync(taskId, toolName, args) {
   // GET NETWORK CONTEXT
   else if (toolName === 'get_network_context') {
     try {
-      const response = await fetch(`${CAMARA_API}/network-context`);
+      const camaraUrl = `${CAMARA_API}/network-context`;
+      const response = await fetch(camaraUrl);
 
       if (!response.ok) {
         const errorText = await response.text();
+        sendSSE(taskId, {
+          type: 'update',
+          status: 'WORKING',
+          step: 'context',
+          message: `CAMARA API hata: ${response.status} ${response.statusText}`,
+          camaraRequest: { method: 'GET', url: camaraUrl },
+          camaraStatus: response.status,
+          camaraResponseText: errorText
+        });
         sendSSE(taskId, {
           type: 'error',
           message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`
@@ -435,6 +514,15 @@ async function executeToolAsync(taskId, toolName, args) {
       }
 
       const data = await response.json();
+      sendSSE(taskId, {
+        type: 'update',
+        status: 'WORKING',
+        step: 'context',
+        message: `CAMARA API yanıtı: ${response.status} OK`,
+        camaraRequest: { method: 'GET', url: camaraUrl },
+        camaraStatus: response.status,
+        camaraResponse: data
+      });
 
       const activeText = data.activeSessions > 0
         ? 'Şu anda hız artırımınız aktif.'
@@ -463,7 +551,7 @@ function sendSSE(taskId, data) {
   const connection = sseConnections.get(taskId);
 
   if (connection) {
-    connection.write(`data: ${JSON.stringify(data)}\n\n`);
+    connection.write(`data: ${JSON.stringify(data)}\n\n`); // akış olarak algılanan satır 
 
     if (data.type === 'complete' || data.type === 'error') {
       setTimeout(() => {
@@ -499,6 +587,21 @@ app.post('/notify/:taskId', (req, res) => {
     task.result = { cloudEvent, eventData, customData };
     tasks.set(taskId, task);
   }
+
+  // Admin panel için: CAMARA notify body'yi SSE ile yayınla
+  sendSSE(taskId, {
+    type: 'update',
+    status: 'WORKING',
+    step: '2.5',
+    message: 'CAMARA notify callback alındı',
+    apiCall: 'CAMARA_NOTIFY',
+    camaraRequest: {
+      method: 'POST',
+      url: `http://localhost:${PORT}/notify/${taskId}`,
+      headers: { 'Content-Type': req.headers['content-type'] }
+    },
+    notifyBody: cloudEvent
+  });
 
   // Bandwidth ve fiyat bilgilerini al
   // Önce customData'dan, yoksa local mapping'den
@@ -541,11 +644,19 @@ app.post('/notify/:taskId', (req, res) => {
       newPrice,
       priceDifference
     },
-    // Debug için CloudEvents verisini de gönder
+    // CAMARA CloudEvents - TÜM alanları gönder
     cloudEvent: {
+      id: cloudEvent.id,
+      source: cloudEvent.source,
       type: cloudEvent.type,
-      sessionId: eventData.sessionId,
-      qosStatus: eventData.qosStatus
+      specversion: cloudEvent.specversion,
+      time: cloudEvent.time,
+      datacontenttype: cloudEvent.datacontenttype,
+      data: {
+        sessionId: eventData.sessionId,
+        qosStatus: eventData.qosStatus,
+        statusInfo: eventData.statusInfo
+      }
     }
   });
 

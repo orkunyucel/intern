@@ -331,10 +331,24 @@ Port: 3000 (server.js ile serve ediliyor)
       margin-bottom: 8px;
     }
 
+    .flow-step .step-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .flow-step .step-label {
       color: var(--wa-light-green);
       font-weight: bold;
       font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .flow-step .step-route {
+      color: var(--wa-light-green);
+      font-size: 10px;
+      letter-spacing: 0.3px;
+      opacity: 0.9;
       text-transform: uppercase;
     }
 
@@ -493,12 +507,12 @@ Port: 3000 (server.js ile serve ediliyor)
     // FLOW STEPS
     // Admin panel'e flow adımı ekleme
     // ===========================================================================
-    function addFlowStep(label, content, data = null, type = '') {
+    function addFlowStep(label, content, data = null, type = '', route = '') {
       // Zaman damgası
       const time = new Date().toLocaleTimeString();
 
       // Flow step'i array'e ekle
-      flowSteps.push({ label, content, data, time, type });
+      flowSteps.push({ label, content, data, time, type, route });
 
       // Panel'i yeniden render et
       renderFlowSteps();
@@ -512,7 +526,10 @@ Port: 3000 (server.js ile serve ediliyor)
       list.innerHTML = flowSteps.map((s, i) => `
     <div class="flow-step ${s.type}">
       <div class="step-header">
-        <span class="step-label">${s.label}</span>
+        <div class="step-left">
+          <span class="step-label">${s.label}</span>
+          ${s.route ? `<span class="step-route">${s.route}</span>` : ''}
+        </div>
         <span class="step-time">${s.time}</span>
       </div>
       <div class="step-content">${s.content}</div>
@@ -553,7 +570,8 @@ Port: 3000 (server.js ile serve ediliyor)
       addMessage(message, 'user');
 
       // Admin panel'e log ekle
-      addFlowStep('USER INPUT', `Kullanıcı mesajı: "${message}"`, null, 'highlight');
+      addFlowStep('USER INPUT', `Kullanıcı mesajı: "${message}"`, null, 'highlight', 'User input');
+      addFlowStep('AGENT REQUEST', 'POST /chat', { message, sessionId }, 'tool', 'UI → Agent');
 
       try {
         // Agent'a POST isteği at
@@ -573,12 +591,33 @@ Port: 3000 (server.js ile serve ediliyor)
         // =========================================================================
 
         // ②③ MCP'den alınan tool listesi
+        if (data.mcp_tools_list_request) {
+          addFlowStep(
+            'MCP TOOLS - REQUEST',
+            'Agent → MCP tools/list',
+            data.mcp_tools_list_request,
+            'tool',
+            'Agent → MCP'
+          );
+        }
+
+        if (data.mcp_tools_list_response) {
+          addFlowStep(
+            'MCP TOOLS - RESPONSE',
+            'MCP → Agent tools/list',
+            data.mcp_tools_list_response,
+            'tool',
+            'MCP → Agent'
+          );
+        }
+
         if (data.tools_obtained) {
           addFlowStep(
             'MCP TOOLS',
             `${data.tools_obtained.length} tool MCP Server'dan alındı`,
             data.tools_obtained,
-            'tool'
+            'tool',
+            'MCP → Agent'
           );
         }
 
@@ -588,7 +627,8 @@ Port: 3000 (server.js ile serve ediliyor)
             'LLM INPUT',
             'Gemini\'ye gönderilen prompt',
             data.llm_input,
-            'llm'
+            'llm',
+            'Agent → LLM'
           );
         }
 
@@ -598,7 +638,8 @@ Port: 3000 (server.js ile serve ediliyor)
             'LLM RAW RESPONSE',
             'Gemini\'den dönen ham yanıt',
             data.llm_raw_response,
-            'llm'
+            'llm',
+            'LLM → Agent'
           );
         }
 
@@ -612,7 +653,28 @@ Port: 3000 (server.js ile serve ediliyor)
               selected_tool: data.tool,
               parameters: data.parameters
             },
-            'llm'
+            'llm',
+            'Agent internal'
+          );
+        }
+
+        if (data.mcp_tool_call_request) {
+          addFlowStep(
+            'MCP CALL - REQUEST',
+            `Agent → MCP tools/call (${data.mcp_tool_call_request?.params?.name || 'unknown'})`,
+            data.mcp_tool_call_request,
+            'tool',
+            'Agent → MCP'
+          );
+        }
+
+        if (data.mcp_tool_call_response) {
+          addFlowStep(
+            'MCP CALL - RESPONSE',
+            'MCP → Agent tools/call',
+            data.mcp_tool_call_response,
+            'tool',
+            'MCP → Agent'
           );
         }
 
@@ -629,7 +691,8 @@ Port: 3000 (server.js ile serve ediliyor)
             'OFFER',
             'Kullanıcıya teklif sunuldu',
             { offer: data.offer_text, tool: data.tool, parameters: data.parameters },
-            'highlight'
+            'highlight',
+            'Agent → User'
           );
         }
         else if (data.type === 'executing') {
@@ -642,7 +705,8 @@ Port: 3000 (server.js ile serve ediliyor)
               'CONFIRMATION',
               `Kullanıcı onayladı: ${data.confirmed_action}`,
               null,
-              'highlight'
+              'highlight',
+              'User → Agent'
             );
           }
 
@@ -650,7 +714,8 @@ Port: 3000 (server.js ile serve ediliyor)
             'EXECUTE',
             `Tool çalıştırılıyor: ${data.tool}`,
             { taskId: data.taskId },
-            'tool'
+            'tool',
+            'Agent → MCP'
           );
 
           // SSE bağlantısı aç ve event'leri dinle
@@ -659,7 +724,7 @@ Port: 3000 (server.js ile serve ediliyor)
         else if (data.type === 'cancelled') {
           // Kullanıcı iptal etti
           addMessage(data.message, 'bot');
-          addFlowStep('CANCELLED', 'İşlem kullanıcı tarafından iptal edildi', null, '');
+          addFlowStep('CANCELLED', 'İşlem kullanıcı tarafından iptal edildi', null, '', 'Agent → User');
         }
         else {
           // Normal mesaj
@@ -669,7 +734,7 @@ Port: 3000 (server.js ile serve ediliyor)
       } catch (err) {
         // Hata durumunda
         addMessage('Hata: ' + err.message, 'bot');
-        addFlowStep('ERROR', err.message, null, '');
+        addFlowStep('ERROR', err.message, null, '', 'UI error');
       }
     }
 
@@ -680,7 +745,7 @@ Port: 3000 (server.js ile serve ediliyor)
     // ===========================================================================
     function connectSSE(taskId) {
       // Admin panel'e SSE başlangıcını log'la
-      addFlowStep('SSE', `SSE bağlantısı açılıyor (Agent üzerinden, taskId: ${taskId})`, null, 'sse');
+      addFlowStep('SSE', `SSE bağlantısı açılıyor (Agent üzerinden, taskId: ${taskId})`, null, 'sse', 'UI → Agent (SSE)');
 
       // EventSource API ile SSE bağlantısı aç
       // flow.md'ye göre: UI → Agent → MCP Server (Agent proxy yapıyor)
@@ -697,7 +762,7 @@ Port: 3000 (server.js ile serve ediliyor)
 
         if (data.type === 'connected') {
           // Bağlantı kuruldu
-          addFlowStep('SSE', 'Bağlantı kuruldu', null, 'sse');
+          addFlowStep('SSE', 'Bağlantı kuruldu', { 'Raw SSE Event': data }, 'sse', 'MCP → Agent → UI');
         }
         else if (data.type === 'update') {
           // WORKING status - işlem devam ediyor
@@ -706,11 +771,14 @@ Port: 3000 (server.js ile serve ediliyor)
           if (data.userMessage) {
             addMessage(data.userMessage, 'working');
             // Bu gerçek bir SSE Update (flow.md: 11)
-            addFlowStep('SSE UPDATE', `Adım ${data.step}: ${data.message}`, data, 'sse');
+            addFlowStep('SSE UPDATE', `Adım ${data.step}: ${data.message}`, { 'Raw SSE Event': data }, 'sse', 'MCP → Agent → UI');
           } else {
             // userMessage yoksa bu bir INTERNAL logdur (flow.md: 9, 10, 12)
             // Admin panelde farklı görünsün
-            addFlowStep('INTERNAL LOG', `Debug: ${data.message}`, data, 'tool');
+            const internalRoute = (data.apiCall === 'CAMARA_NOTIFY' || data.apiResponse || data.camaraResponse || data.camaraStatus)
+              ? 'CAMARA → MCP'
+              : 'MCP → CAMARA';
+            addFlowStep('INTERNAL LOG', `Debug: ${data.message}`, { 'Raw SSE Event': data }, 'tool', internalRoute);
           }
 
           // Bandwidth göstergesini güncelle (işlem devam ediyor - animasyon)
@@ -724,18 +792,24 @@ Port: 3000 (server.js ile serve ediliyor)
           // User panel: userMessage, Admin: message (teknik)
           addMessage(`<strong>${data.userMessage || data.message}</strong>`, 'success');
 
-          // Admin Panel: Detaylı bilgiler
-          addFlowStep('SSE COMPLETE', 'İşlem başarıyla tamamlandı', {
-            message: data.message,
-            step: data.step
-          }, 'sse');
+          // Admin Panel: FULL RAW DATA önce
+          addFlowStep('SSE COMPLETE - RAW DATA', '🔍 Tam SSE Event (MCP Server → UI)', { 'Complete Event': data }, 'sse', 'MCP → Agent → UI');
 
-          // CloudEvents bilgisi (CAMARA callback'ten gelen)
+          // CloudEvents bilgisi (CAMARA callback'ten gelen - TÜM alanlar)
           if (data.cloudEvent) {
             addFlowStep('CAMARA CALLBACK', `CloudEvents: ${data.cloudEvent.type}`, {
-              sessionId: data.cloudEvent.sessionId,
-              qosStatus: data.cloudEvent.qosStatus
-            }, 'tool');
+              'CloudEvent ID': data.cloudEvent.id,
+              'Source': data.cloudEvent.source,
+              'Type': data.cloudEvent.type,
+              'Spec Version': data.cloudEvent.specversion,
+              'Time': data.cloudEvent.time,
+              'Content Type': data.cloudEvent.datacontenttype,
+              'Data': {
+                sessionId: data.cloudEvent.data?.sessionId,
+                qosStatus: data.cloudEvent.data?.qosStatus,
+                statusInfo: data.cloudEvent.data?.statusInfo
+              }
+            }, 'tool', 'CAMARA → MCP');
           }
 
           // Fiyat bilgisi
@@ -746,17 +820,17 @@ Port: 3000 (server.js ile serve ediliyor)
               : priceDiff < 0
                 ? `${priceDiff} TL (downgrade)`
                 : 'Değişiklik yok';
-            addFlowStep('PRICE INFO', `${data.priceInfo.oldPrice} TL → ${data.priceInfo.newPrice} TL (${priceText})`, data.priceInfo, 'highlight');
+            addFlowStep('PRICE INFO', `${data.priceInfo.oldPrice} TL → ${data.priceInfo.newPrice} TL (${priceText})`, data.priceInfo, 'highlight', 'MCP → Agent → UI');
           }
 
           // Son bandwidth değeri
           if (data.finalBandwidth) {
-            addFlowStep('FINAL BANDWIDTH', `Yeni hız: ${data.finalBandwidth}`, null, 'highlight');
+            addFlowStep('FINAL BANDWIDTH', `Yeni hız: ${data.finalBandwidth}`, null, 'highlight', 'MCP → Agent → UI');
           }
 
           // Kullanıcıya giden mesaj
           if (data.userMessage) {
-            addFlowStep('USER MESSAGE', `"${data.userMessage}"`, null, 'highlight');
+            addFlowStep('USER MESSAGE', `"${data.userMessage}"`, null, 'highlight', 'MCP → Agent → UI');
           }
 
           // Bandwidth göstergesini final değerle güncelle
@@ -775,7 +849,7 @@ Port: 3000 (server.js ile serve ediliyor)
         else if (data.type === 'error') {
           // Hata
           addMessage('Hata: ' + data.message, 'bot');
-          addFlowStep('SSE ERROR', data.message, null, 'sse');
+          addFlowStep('SSE ERROR', data.message, { 'Raw SSE Event': data }, 'sse', 'MCP → Agent → UI');
           bandwidthEl.classList.remove('updating');
           eventSource.close();
         }
@@ -785,7 +859,7 @@ Port: 3000 (server.js ile serve ediliyor)
       eventSource.onerror = () => {
         const bandwidthEl = document.getElementById('bandwidthValue');
         bandwidthEl.classList.remove('updating');
-        addFlowStep('SSE', 'Bağlantı kapandı', null, 'sse');
+        addFlowStep('SSE', 'Bağlantı kapandı', null, 'sse', 'UI → Agent (SSE)');
         if (!reconnectNotified) {
           addMessage('Bağlantı koptu, tekrar bağlanılıyor...', 'bot');
           reconnectNotified = true;
