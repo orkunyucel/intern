@@ -34,10 +34,28 @@ http://localhost:3000
 
 ## Kullanım
 
-1. UI'da "700 yap" yaz
+1. UI'da mesaj yaz
 2. Agent onay isteyecek
 3. "evet" yaz
 4. SSE ile durum güncellemelerini izle
+
+## Test Promptları
+
+| Tool | Örnek Promptlar |
+|------|-----------------|
+| `create_qos_session` | "hızımı 800 yap", "700 Mbps istiyorum", "limitimi artır" |
+| `get_qos_status` | Bu tool sessionId gerektirir (otomatik kullanılmaz) |
+| `delete_qos_session` | Bu tool sessionId gerektirir (otomatik kullanılmaz) |
+| `get_network_context` | "hızım nedir", "mevcut bandwidth", "internet hızım kaç" |
+
+### QoS Profil Mapping
+
+| Profil | Bandwidth | Fiyat | Örnek Prompt |
+|--------|-----------|-------|--------------|
+| QOS_S | 50 Mbps | 100 TL | "hızımı 50 yap", "temel paket" |
+| QOS_M | 200 Mbps | 200 TL | "hızımı 200 yap", "standart paket" |
+| QOS_L | 700 Mbps | 300 TL | "hızımı 800 yap", "700 istiyorum" |
+| QOS_E | 1500 Mbps | 400 TL | "1500 yap", "ultra paket" |
 
 ## Portlar
 

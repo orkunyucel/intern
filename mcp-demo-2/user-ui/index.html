@@ -720,7 +720,41 @@ Port: 3000 (server.js ile serve ediliyor)
           // SUCCESS - işlem tamamlandı
           // User panel: userMessage, Admin: message (teknik)
           addMessage(`<strong>${data.userMessage || data.message}</strong>`, 'success');
-          addFlowStep('SSE COMPLETE', 'İşlem başarıyla tamamlandı', data.result, 'sse');
+
+          // Admin Panel: Detaylı bilgiler
+          addFlowStep('SSE COMPLETE', 'İşlem başarıyla tamamlandı', {
+            message: data.message,
+            step: data.step
+          }, 'sse');
+
+          // CloudEvents bilgisi (CAMARA callback'ten gelen)
+          if (data.cloudEvent) {
+            addFlowStep('CAMARA CALLBACK', `CloudEvents: ${data.cloudEvent.type}`, {
+              sessionId: data.cloudEvent.sessionId,
+              qosStatus: data.cloudEvent.qosStatus
+            }, 'tool');
+          }
+
+          // Fiyat bilgisi
+          if (data.priceInfo) {
+            const priceDiff = data.priceInfo.priceDifference;
+            const priceText = priceDiff > 0
+              ? `+${priceDiff} TL (upgrade)`
+              : priceDiff < 0
+                ? `${priceDiff} TL (downgrade)`
+                : 'Değişiklik yok';
+            addFlowStep('PRICE INFO', `${data.priceInfo.oldPrice} TL → ${data.priceInfo.newPrice} TL (${priceText})`, data.priceInfo, 'highlight');
+          }
+
+          // Son bandwidth değeri
+          if (data.finalBandwidth) {
+            addFlowStep('FINAL BANDWIDTH', `Yeni hız: ${data.finalBandwidth}`, null, 'highlight');
+          }
+
+          // Kullanıcıya giden mesaj
+          if (data.userMessage) {
+            addFlowStep('USER MESSAGE', `"${data.userMessage}"`, null, 'highlight');
+          }
 
           // Bandwidth göstergesini final değerle güncelle
           if (data.finalBandwidth) {

@@ -18,10 +18,37 @@ const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+
+// JSON body parser - hem application/json hem application/cloudevents+json için
+app.use(express.json({
+  type: ['application/json', 'application/cloudevents+json']
+}));
 
 const PORT = 5001;
 const CAMARA_API = 'http://localhost:5002';
+
+// POC MOCK DATA - CAMARA request için sabit değerler
+// Gerçek sistemde bunlar authentication'dan veya context'ten gelir
+const MOCK_DEVICE = {
+  phoneNumber: "+905551234567"
+};
+
+const MOCK_APPLICATION_SERVER = {
+  ipv4Address: "192.168.1.100"
+};
+
+// QoS profil → bandwidth/fiyat mapping
+// CAMARA bu bilgileri vermez, biz local olarak tutuyoruz
+const QOS_PROFILE_INFO = {
+  QOS_S: { bandwidth: '50 Mbps', latency: '100ms', price: 100 },
+  QOS_M: { bandwidth: '200 Mbps', latency: '50ms', price: 200 },
+  QOS_L: { bandwidth: '700 Mbps', latency: '20ms', price: 300 },
+  QOS_E: { bandwidth: '1500 Mbps', latency: '10ms', price: 400 }
+};
+
+// Kullanıcının mevcut durumu (fiyat farkı hesabı için)
+let currentUserPlan = 'QOS_M';
+let currentUserPrice = 200;
 
 // SSE CONNECTION STORAGE
 const sseConnections = new Map();
@@ -29,9 +56,7 @@ const sseConnections = new Map();
 // TASK STORAGE
 const tasks = new Map();
 
-// -----------------------------------------------------------------------------
 // JSON-RPC 2.0 ERROR CODES
-// -----------------------------------------------------------------------------
 const JSON_RPC_ERRORS = {
   PARSE_ERROR: { code: -32700, message: 'Parse error' },
   INVALID_REQUEST: { code: -32600, message: 'Invalid Request' },
@@ -40,9 +65,7 @@ const JSON_RPC_ERRORS = {
   INTERNAL_ERROR: { code: -32603, message: 'Internal error' }
 };
 
-// -----------------------------------------------------------------------------
 // MCP TOOL DEFINITIONS
-// -----------------------------------------------------------------------------
 const TOOLS = [
   {
     name: 'create_qos_session',
@@ -267,13 +290,17 @@ async function executeToolAsync(taskId, toolName, args) {
 
       await sleep(500);
 
+      // CAMARA API'ye gerçek formatta request gönder
       const response = await fetch(`${CAMARA_API}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // CAMARA CreateSession schema
+          device: MOCK_DEVICE,                    // POC için sabit device
+          applicationServer: MOCK_APPLICATION_SERVER,  // POC için sabit backend IP
           qosProfile: args.qosProfile,
           duration: args.duration || 3600,
-          notificationUrl: `http://localhost:${PORT}/notify/${taskId}`
+          sink: `http://localhost:${PORT}/notify/${taskId}`  // Callback URL (CAMARA formatı)
         })
       });
 
@@ -416,41 +443,83 @@ function sendSSE(taskId, data) {
   }
 }
 
-// CAMARA CALLBACK HANDLER
+// CAMARA CALLBACK HANDLER - CloudEvents formatında callback alır
+// CAMARA async işlem tamamlandığında buraya POST yapar
 app.post('/notify/:taskId', (req, res) => {
   const { taskId } = req.params;
-  const data = req.body;
+  const cloudEvent = req.body;  // CloudEvents formatında gelir
 
-  console.log(`[MCP] Notify received for task ${taskId}:`, data);
+  // Debug: Gelen veriyi tam logla
+  console.log(`[MCP] ✓ CloudEvent received for task ${taskId}`);
+  console.log(`[MCP]   Full body:`, JSON.stringify(cloudEvent, null, 2));
 
+  // CloudEvents formatından verileri çıkar
+  const eventData = cloudEvent.data || {};
+  const customData = cloudEvent._custom || {};
+
+  console.log(`[MCP]   Event type: ${cloudEvent.type}`);
+  console.log(`[MCP]   Event data:`, eventData);
+  console.log(`[MCP]   Custom data:`, customData);
+
+  // Task'ı güncelle
   const task = tasks.get(taskId);
   if (task) {
     task.status = 'SUCCESS';
-    task.result = data;
+    task.result = { cloudEvent, eventData, customData };
     tasks.set(taskId, task);
   }
 
+  // Bandwidth ve fiyat bilgilerini al
+  // Önce customData'dan, yoksa local mapping'den
+  const qosProfile = customData.qosProfile || task?.qosProfile;
+  const bandwidth = customData.bandwidth || QOS_PROFILE_INFO[qosProfile]?.bandwidth || 'bilinmiyor';
+
+  // Fiyat bilgileri - CAMARA'dan gelen custom veya hesaplanan
+  const oldPrice = customData.oldPrice !== undefined ? customData.oldPrice : currentUserPrice;
+  const newPrice = customData.newPrice !== undefined ? customData.newPrice : QOS_PROFILE_INFO[qosProfile]?.price;
+  const priceDifference = customData.priceDifference !== undefined ? customData.priceDifference : (newPrice - oldPrice);
+
+  console.log(`[MCP]   Calculated: bandwidth=${bandwidth}, oldPrice=${oldPrice}, newPrice=${newPrice}, diff=${priceDifference}`);
+
+  // Kullanıcı state'ini güncelle
+  if (qosProfile) {
+    currentUserPlan = qosProfile;
+    currentUserPrice = newPrice;
+  }
+
+  // Kullanıcıya gösterilecek mesajı oluştur
+  let userMessage;
+  if (priceDifference > 0) {
+    userMessage = `Hızınız ${bandwidth}'e yükseltildi! (${priceDifference} TL ek ücret) ✓`;
+  } else if (priceDifference < 0) {
+    userMessage = `Hızınız ${bandwidth}'e düşürüldü. (${Math.abs(priceDifference)} TL tasarruf) ✓`;
+  } else {
+    userMessage = `Hızınız ${bandwidth}'e ayarlandı! ✓`;
+  }
+
+  // SSE ile kullanıcıya bildir
   sendSSE(taskId, {
     type: 'complete',
     status: 'SUCCESS',
     step: 3,
-    message: `Ağ optimizasyonu tamamlandı! Yeni bandwidth: ${data.bandwidth}. ${data.priceText || ''}`,
-    userMessage: data.priceDifference > 0
-      ? `Hızınız ${data.bandwidth}'e yükseltildi! (${data.priceDifference} TL ek ücret) ✓`
-      : data.priceDifference < 0
-        ? `Hızınız ${data.bandwidth}'e düşürüldü. (${Math.abs(data.priceDifference)} TL tasarruf) ✓`
-        : `Hızınız ${data.bandwidth}'e ayarlandı! ✓`,
-    finalBandwidth: data.bandwidth,
+    message: `Ağ optimizasyonu tamamlandı! Bandwidth: ${bandwidth}`,
+    userMessage,
+    finalBandwidth: bandwidth,
     priceInfo: {
-      oldPrice: data.oldPrice,
-      newPrice: data.newPrice,
-      priceDifference: data.priceDifference,
-      priceText: data.priceText
+      oldPrice,
+      newPrice,
+      priceDifference
     },
-    result: data
+    // Debug için CloudEvents verisini de gönder
+    cloudEvent: {
+      type: cloudEvent.type,
+      sessionId: eventData.sessionId,
+      qosStatus: eventData.qosStatus
+    }
   });
 
-  res.json({ received: true });
+  // CAMARA spesine göre 204 No Content dönmeli
+  res.status(204).send();
 });
 
 // SSE ENDPOINT

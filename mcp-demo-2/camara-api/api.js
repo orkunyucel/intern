@@ -1,60 +1,60 @@
 /**
- 
  * CAMARA QoD (Quality on Demand) API - Mock Implementation
-
- * Bu dosya CAMARA standardına uygun bir QoD API simülasyonudur.
- * Bu mock versiyon, POC için async callback pattern'i simüle eder.
+ * 
+ * CAMARA OpenAPI Spec v1.1.0 uyumlu mock API.
+ * Gerçek CAMARA formatlarını kullanarak MCP Server'ı test etmemizi sağlar.
  *
  * FLOW'daki Rolü:
  * - ⑨ MCP Server'dan API call alır
- * - ⑩ 201 Created döner (hemen)
- * - ⑫ 3 saniye sonra /notify callback'i MCP Server'a gönderir
+ * - ⑩ 201 Created döner (CAMARA SessionInfo formatında)
+ * - ⑫ 3 saniye sonra CloudEvents formatında callback gönderir
  *
  * Port: 5002
- * ============================================================================
  */
 
-const express = require('express');  // Web framework
-const cors = require('cors');        // Cross-Origin Resource Sharing (UI'dan erişim için)
-const { v4: uuidv4 } = require('uuid'); // Unique session ID üretimi
+const express = require('express');
+const cors = require('cors');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-app.use(cors());           // Tüm origin'lerden gelen isteklere izin ver
-app.use(express.json());   // JSON body parsing
+app.use(cors());
+app.use(express.json());
 
 const PORT = 5002;
 
-// -----------------------------------------------------------------------------
-// IN-MEMORY SESSION STORAGE
-// Gerçek sistemde bu bir veritabanı olurdu (PostgreSQL, Redis vb.)
-// POC için basit bir Map kullanıyoruz
-// -----------------------------------------------------------------------------
-const sessions = new Map();
+// =============================================================================
+// POC MOCK DATA - Gerçek CAMARA formatında
+// Tüm mock veriler tek yerde toplanır, yarın gerçek data geldiğinde burası değişir
+// =============================================================================
 
-// -----------------------------------------------------------------------------
-// QoS PROFILE DEFINITIONS
-// CAMARA standardına göre QoS profilleri ve karşılık gelen bandwidth değerleri
-// LLM, user'ın "700 Mbps istiyorum" demesini QOS_L'e map eder
-// -----------------------------------------------------------------------------
-const QOS_PROFILES = {
-  QOS_S: { bandwidth: '50 Mbps', latency: '100ms', price: 100 },   // Small - Temel kullanım - 100 TL
-  QOS_M: { bandwidth: '200 Mbps', latency: '50ms', price: 200 },   // Medium - HD streaming - 200 TL
-  QOS_L: { bandwidth: '700 Mbps', latency: '20ms', price: 300 },   // Large - 4K streaming - 300 TL
-  QOS_E: { bandwidth: '1500 Mbps', latency: '10ms', price: 400 }   // Extra Large - Gaming/Pro - 400 TL
+// POC için sabit device bilgisi (gerçekte 3-legged token'dan gelir)
+const MOCK_DEVICE = {
+  phoneNumber: "+905551234567"
 };
 
-// -----------------------------------------------------------------------------
-// CENTRALIZED DEVICE STATE
-// Tek bir state objesi - tüm bandwidth değişiklikleri buradan yönetilir
-// Bu POC için fake cihaz durumu - gerçek sistemde network'ten gelir
-// -----------------------------------------------------------------------------
+// POC için sabit application server (backend IP)
+const MOCK_APPLICATION_SERVER = {
+  ipv4Address: "192.168.1.100"
+};
+
+// QoS profilleri ve karşılık gelen bandwidth/fiyat değerleri
+// NOT: Gerçek CAMARA bu bilgileri ayrı QoS Profiles API'den verir
+// POC için burada tutuyoruz
+const QOS_PROFILES = {
+  QOS_S: { bandwidth: '50 Mbps', latency: '100ms', price: 100 },
+  QOS_M: { bandwidth: '200 Mbps', latency: '50ms', price: 200 },
+  QOS_L: { bandwidth: '700 Mbps', latency: '20ms', price: 300 },
+  QOS_E: { bandwidth: '1500 Mbps', latency: '10ms', price: 400 }
+};
+
+// Kullanıcının mevcut durumu (merkezi state)
 const DEFAULT_BANDWIDTH = '200 Mbps';
-const DEFAULT_PLAN = 'QOS_M';  // Kullanıcının mevcut planı
+const DEFAULT_PLAN = 'QOS_M';
 
 const deviceState = {
   currentBandwidth: DEFAULT_BANDWIDTH,
-  currentPlan: DEFAULT_PLAN,        // Kullanıcının mevcut QoS planı
-  currentPrice: QOS_PROFILES[DEFAULT_PLAN].price,  // Mevcut plan ücreti
+  currentPlan: DEFAULT_PLAN,
+  currentPrice: QOS_PROFILES[DEFAULT_PLAN].price,
   city: 'İstanbul',
   country: 'Türkiye',
   networkType: '5G',
@@ -62,227 +62,245 @@ const deviceState = {
   signalStrength: 'Excellent'
 };
 
-/**
- * ============================================================================
- * POST /sessions - QoS Session Oluştur
- * ============================================================================
- *
- * FLOW Adımları:
- * Request Body:
- * {
- *   "qosProfile": "QOS_L",           // Zorunlu: QoS profili
- *   "duration": 3600,                 // Opsiyonel: Session süresi (saniye)
- *   "notificationUrl": "http://..."   // Callback URL (MCP Server'ın /notify endpoint'i)
- * }
- *
- * Response (201 Created):
- * {
- *   "sessionId": "uuid",
- *   "qosStatus": "REQUESTED",
- *   "qosProfile": "QOS_L",
- *   "bandwidth": "700 Mbps",
- *   "latency": "20ms"
- * }
- */
-app.post('/sessions', (req, res) => {
-  // Request body'den parametreleri al
-  const { qosProfile, duration = 3600, notificationUrl } = req.body;
+// Session storage (memory)
+const sessions = new Map();
 
-  // QoS profili validasyonu
-  // Geçersiz profil gönderilirse 400 Bad Request döner
+// =============================================================================
+// POST /sessions - QoS Session Oluştur (CAMARA Spec v1.1.0)
+// =============================================================================
+// Request: CreateSession schema (device, applicationServer, qosProfile, duration, sink)
+// Response: SessionInfo schema (sessionId, qosStatus, duration, applicationServer, qosProfile)
+// =============================================================================
+app.post('/sessions', (req, res) => {
+  // CAMARA formatında request body parse et
+  const {
+    device,                    // Opsiyonel (3-legged token'da zorunlu değil)
+    applicationServer,         // Zorunlu
+    qosProfile,                // Zorunlu
+    duration = 3600,           // Varsayılan 1 saat
+    sink                       // Callback URL (eski adı: notificationUrl)
+  } = req.body;
+
+  // Validasyonlar
   if (!qosProfile || !QOS_PROFILES[qosProfile]) {
     return res.status(400).json({
-      error: 'Invalid qosProfile',
-      validProfiles: Object.keys(QOS_PROFILES)
+      status: 400,
+      code: 'INVALID_ARGUMENT',
+      message: `Invalid qosProfile. Valid profiles: ${Object.keys(QOS_PROFILES).join(', ')}`
     });
   }
 
-  // Unique session ID üret (UUID v4 formatında)
-  const sessionId = uuidv4();
+  if (!applicationServer) {
+    return res.status(400).json({
+      status: 400,
+      code: 'INVALID_ARGUMENT',
+      message: 'applicationServer is required'
+    });
+  }
 
-  // Session objesi oluştur
+  // Session ID üret (UUID v4)
+  const sessionId = uuidv4();
+  const now = new Date();
+
+  // Session objesi (internal storage için)
   const session = {
     sessionId,
     qosProfile,
-    qosStatus: 'REQUESTED',  // Başlangıç durumu: İstek alındı
+    qosStatus: 'REQUESTED',
     duration,
-    startedAt: new Date().toISOString(),
-    notificationUrl          // Callback için sakla
+    device: device || MOCK_DEVICE,  // Device yoksa mock kullan
+    applicationServer,
+    sink,
+    createdAt: now.toISOString()
   };
 
-  // Session'ı memory'de sakla
   sessions.set(sessionId, session);
 
-  // Console'a log bas (debug için)
-  console.log(`[CAMARA] Session created: ${sessionId}, Profile: ${qosProfile}`);
+  console.log(`[CAMARA] ✓ Session created: ${sessionId}`);
+  console.log(`[CAMARA]   Profile: ${qosProfile}, Duration: ${duration}s`);
 
-  // ⑩ HEMEN 201 Created döner (async pattern)
-  // Gerçek CAMARA API'si de böyle çalışır - işlem arka planda devam eder
+  // ⑩ 201 Created - CAMARA SessionInfo formatında response
+  // NOT: bandwidth/latency burada YOK - gerçek CAMARA da vermez
   res.status(201).json({
     sessionId,
     qosStatus: 'REQUESTED',
     qosProfile,
-    ...QOS_PROFILES[qosProfile]  // bandwidth ve latency bilgilerini ekle
+    duration,
+    applicationServer
   });
 
-  // ⑫ ASYNC NETWORK OPERATION SİMÜLASYONU
-  // 3 saniye sonra callback gönder (gerçek sistemde network provisioning süresi)
-  setTimeout(async () => {
-    // Session durumunu güncelle
-    session.qosStatus = 'AVAILABLE';  // Artık kullanıma hazır
-    sessions.set(sessionId, session);
+  // ⑫ Async callback - 3 saniye sonra CloudEvents formatında
+  if (sink) {
+    setTimeout(async () => {
+      // Session durumunu güncelle
+      session.qosStatus = 'AVAILABLE';
+      session.startedAt = new Date().toISOString();
+      session.expiresAt = new Date(Date.now() + duration * 1000).toISOString();
+      sessions.set(sessionId, session);
 
-    // ▼▼▼ FİYAT FARKI HESAPLAMASI ▼▼▼
-    const oldPrice = deviceState.currentPrice;
-    const newPrice = QOS_PROFILES[qosProfile].price;
-    const priceDifference = newPrice - oldPrice;  // Pozitif = upgrade, negatif = downgrade
-    // ▲▲▲ FİYAT FARKI HESAPLAMASI ▲▲▲
+      // Fiyat hesaplaması (bu bizim custom logic, CAMARA'da yok)
+      const oldPrice = deviceState.currentPrice;
+      const newPrice = QOS_PROFILES[qosProfile].price;
+      const priceDifference = newPrice - oldPrice;
 
-    // ▼▼▼ MERKEZI STATE DEĞİŞİKLİĞİ ▼▼▼
-    deviceState.currentBandwidth = QOS_PROFILES[qosProfile].bandwidth;
-    deviceState.currentPlan = qosProfile;
-    deviceState.currentPrice = newPrice;
-    console.log(`[CAMARA] Bandwidth changed: ${deviceState.currentBandwidth}`);
-    console.log(`[CAMARA] Price difference: ${priceDifference} TL (${oldPrice} TL -> ${newPrice} TL)`);
-    // ▲▲▲ MERKEZI STATE DEĞİŞİKLİĞİ ▲▲▲
+      // Merkezi state güncelle
+      deviceState.currentBandwidth = QOS_PROFILES[qosProfile].bandwidth;
+      deviceState.currentPlan = qosProfile;
+      deviceState.currentPrice = newPrice;
 
-    console.log(`[CAMARA] Session ${sessionId} is now AVAILABLE`);
+      console.log(`[CAMARA] ✓ Session AVAILABLE: ${sessionId}`);
+      console.log(`[CAMARA]   Bandwidth: ${deviceState.currentBandwidth}`);
+      console.log(`[CAMARA]   Price: ${oldPrice} TL → ${newPrice} TL (${priceDifference >= 0 ? '+' : ''}${priceDifference} TL)`);
 
-    // MCP Server'a callback notification gönder
-    // Bu, MCP Server'ın /notify/:taskId endpoint'ine POST yapar
-    if (notificationUrl) {
+      // CloudEvents formatında callback gönder (CAMARA Spec)
       try {
-        await fetch(notificationUrl, {
+        await fetch(sink, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/cloudevents+json'  // CloudEvents content type
+          },
           body: JSON.stringify({
-            sessionId,
-            qosStatus: 'AVAILABLE',
-            qosProfile,
-            ...QOS_PROFILES[qosProfile],
-            // Fiyat bilgileri
-            oldPrice,
-            newPrice,
-            priceDifference,
-            priceText: priceDifference > 0
-              ? `${priceDifference} TL ek ücret`
-              : priceDifference < 0
-                ? `${Math.abs(priceDifference)} TL tasarruf`
-                : 'Ücret değişikliği yok'
+            // CloudEvents required fields
+            id: uuidv4(),
+            source: `http://localhost:${PORT}/sessions/${sessionId}`,
+            type: 'org.camaraproject.quality-on-demand.v1.qos-status-changed',
+            specversion: '1.0',
+            time: new Date().toISOString(),
+            datacontenttype: 'application/json',
+
+            // Event payload
+            data: {
+              sessionId,
+              qosStatus: 'AVAILABLE',
+              statusInfo: null
+            },
+
+            // CUSTOM: Bizim eklediğimiz fiyat bilgileri (CAMARA standartında yok)
+            // MCP Server bu bilgileri kullanarak kullanıcı mesajı oluşturur
+            _custom: {
+              qosProfile,
+              bandwidth: QOS_PROFILES[qosProfile].bandwidth,
+              latency: QOS_PROFILES[qosProfile].latency,
+              oldPrice,
+              newPrice,
+              priceDifference
+            }
           })
         });
-        console.log(`[CAMARA] Notification sent to ${notificationUrl}`);
+        console.log(`[CAMARA] ✓ CloudEvent notification sent to ${sink}`);
       } catch (err) {
-        // Callback gönderilemezse sadece log bas, işlem devam eder
-        console.error(`[CAMARA] Failed to send notification: ${err.message}`);
+        console.error(`[CAMARA] ✗ Notification failed: ${err.message}`);
       }
-    }
-  }, 3000);  // 3000ms = 3 saniye
+    }, 3000);  // 3 saniye delay (network provisioning simülasyonu)
+  }
 });
 
-/**
- * GET /sessions/:sessionId - Session Durumunu Sorgula
- *
- * Belirli bir session'ın mevcut durumunu döner.
- * get_qos_status tool'u bu endpoint'i çağırır.
- */
+// =============================================================================
+// GET /sessions/:sessionId - Session Durumu Sorgula
+// =============================================================================
 app.get('/sessions/:sessionId', (req, res) => {
   const { sessionId } = req.params;
   const session = sessions.get(sessionId);
 
-  // Session bulunamazsa 404 döner
   if (!session) {
-    return res.status(404).json({ error: 'Session not found' });
+    return res.status(404).json({
+      status: 404,
+      code: 'NOT_FOUND',
+      message: 'Session not found'
+    });
   }
 
-  res.json(session);
+  // CAMARA SessionInfo formatında döndür
+  res.json({
+    sessionId: session.sessionId,
+    qosStatus: session.qosStatus,
+    qosProfile: session.qosProfile,
+    duration: session.duration,
+    applicationServer: session.applicationServer,
+    startedAt: session.startedAt,
+    expiresAt: session.expiresAt
+  });
 });
 
-/**
-
- * DELETE /sessions/:sessionId - Session'ı Sonlandır
- * Aktif bir QoS session'ı sonlandırır.
- * Kullanıcı "session'ı kapat" dediğinde LLM bu endpoint'i çağırır.
- */
+// =============================================================================
+// DELETE /sessions/:sessionId - Session Sonlandır
+// =============================================================================
 app.delete('/sessions/:sessionId', (req, res) => {
   const { sessionId } = req.params;
+  const session = sessions.get(sessionId);
 
-  // Session yoksa 404 döner
-  if (!sessions.has(sessionId)) {
-    return res.status(404).json({ error: 'Session not found' });
+  if (!session) {
+    return res.status(404).json({
+      status: 404,
+      code: 'NOT_FOUND',
+      message: 'Session not found'
+    });
   }
 
-  // Session'ı sil
+  // Session sil ve state'i sıfırla
   sessions.delete(sessionId);
-
-  // ▼▼▼ MERKEZI BANDWIDTH SIFIRLAMA ▼▼▼
   deviceState.currentBandwidth = DEFAULT_BANDWIDTH;
-  console.log(`[CAMARA] Bandwidth reset to default: ${DEFAULT_BANDWIDTH}`);
-  // ▲▲▲ MERKEZI BANDWIDTH SIFIRLAMA ▲▲▲
+  deviceState.currentPlan = DEFAULT_PLAN;
+  deviceState.currentPrice = QOS_PROFILES[DEFAULT_PLAN].price;
 
-  console.log(`[CAMARA] Session deleted: ${sessionId}`);
+  console.log(`[CAMARA] ✓ Session deleted: ${sessionId}`);
+  console.log(`[CAMARA]   Bandwidth reset to: ${DEFAULT_BANDWIDTH}`);
 
-  // 204 No Content - başarılı silme, body yok
+  // Callback gönder (CloudEvents formatında)
+  if (session.sink) {
+    fetch(session.sink, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/cloudevents+json' },
+      body: JSON.stringify({
+        id: uuidv4(),
+        source: `http://localhost:${PORT}/sessions/${sessionId}`,
+        type: 'org.camaraproject.quality-on-demand.v1.qos-status-changed',
+        specversion: '1.0',
+        time: new Date().toISOString(),
+        datacontenttype: 'application/json',
+        data: {
+          sessionId,
+          qosStatus: 'UNAVAILABLE',
+          statusInfo: 'DELETE_REQUESTED'
+        }
+      })
+    }).catch(err => console.error(`[CAMARA] Notification failed: ${err.message}`));
+  }
+
   res.status(204).send();
 });
 
-/**
- * ============================================================================
- * GET /network-context - Device Network Context
- * ============================================================================
- *
- * Cihazın mevcut ağ durumunu ve konum bilgisini döner.
- * "Bandwidth değerim nedir?" gibi sorular için kullanılır.
- */
+// =============================================================================
+// GET /network-context - Device Network Context (POC Helper)
+// =============================================================================
+// Bu endpoint CAMARA standardında yok, POC için eklendi
+// =============================================================================
 app.get('/network-context', (req, res) => {
-  // Aktif session var mı kontrol et
   const activeSessions = Array.from(sessions.values()).filter(s => s.qosStatus === 'AVAILABLE');
-  const hasActiveSession = activeSessions.length > 0;
-  let activeSessionInfo = null;
 
-  if (hasActiveSession) {
-    const activeSession = activeSessions[0];
-    activeSessionInfo = {
-      sessionId: activeSession.sessionId,
-      qosProfile: activeSession.qosProfile,
-      createdAt: activeSession.createdAt
-    };
-  }
-
-  // Merkezi deviceState'ten al 
-  const networkContext = {
-    currentBandwidth: deviceState.currentBandwidth,  // ← Merkezi state'ten
-    currentPlan: deviceState.currentPlan,            // ← Mevcut QoS planı
-    currentPrice: deviceState.currentPrice,          // ← Mevcut plan ücreti (TL)
+  res.json({
+    currentBandwidth: deviceState.currentBandwidth,
+    currentPlan: deviceState.currentPlan,
+    currentPrice: deviceState.currentPrice,
     city: deviceState.city,
     country: deviceState.country,
     networkType: deviceState.networkType,
     roaming: deviceState.roaming,
     signalStrength: deviceState.signalStrength,
-    activeSession: hasActiveSession,
-    activeSessionInfo
-  };
-
-  console.log(`[CAMARA] Network context requested:`, networkContext);
-  res.json(networkContext);
+    activeSessions: activeSessions.length
+  });
 });
 
-/**
- * ============================================================================
- * GET /health - Health Check Endpoint
- * ============================================================================
- *
- * Servisin ayakta olup olmadığını kontrol etmek için.
- * Load balancer'lar ve monitoring sistemleri bu endpoint'i kullanır.
- */
+// =============================================================================
+// GET /health - Health Check
+// =============================================================================
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'camara-api' });
+  res.json({ status: 'ok', service: 'camara-api', version: '1.1.0' });
 });
 
-// -----------------------------------------------------------------------------
-// SERVER BAŞLAT
-// -----------------------------------------------------------------------------
+// Server başlat
 app.listen(PORT, () => {
-  console.log(`[CAMARA] API running on http://localhost:${PORT}`);
-  console.log(`[CAMARA] Available QoS Profiles: ${Object.keys(QOS_PROFILES).join(', ')}`);
+  console.log(`[CAMARA] ✓ API running on http://localhost:${PORT}`);
+  console.log(`[CAMARA]   Spec: CAMARA QoD v1.1.0 (Mock)`);
+  console.log(`[CAMARA]   Profiles: ${Object.keys(QOS_PROFILES).join(', ')}`);
 });
