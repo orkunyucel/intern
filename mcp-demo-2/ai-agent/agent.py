@@ -42,6 +42,17 @@ def get_next_request_id():
     return request_id_counter
 
 
+def safe_parse_llm_json(raw_text):
+    """
+    LLM yanıtını güvenli şekilde JSON parse et.
+    Parse başarısız olursa None döndür.
+    """
+    try:
+        return json.loads(raw_text.strip())
+    except Exception:
+        return None
+
+
 def get_tools_from_mcp():
     """
     MCP Server'dan Tool Listesini Al (JSON-RPC 2.0)
@@ -60,7 +71,7 @@ def get_tools_from_mcp():
         "jsonrpc": "2.0",
         "method": "tools/list",
         "id": get_next_request_id()
-    })
+    }, timeout=10)
     return response.json().get('result', {}).get('tools', [])
 
 
@@ -92,7 +103,7 @@ def execute_tool(tool_name, arguments):
             "arguments": arguments
         },
         "id": get_next_request_id()
-    })
+    }, timeout=15)
     return response.json().get('result', {})
 
 
@@ -195,7 +206,15 @@ def ask_llm(user_message, tools):
     elif '```' in response_text:
         response_text = response_text.split('```')[1].split('```')[0]
 
-    parsed = json.loads(response_text.strip())
+    parsed = safe_parse_llm_json(response_text)
+
+    if parsed is None:
+        return {
+            "_raw_response": raw_response,
+            "_prompt": prompt,
+            "tool": None,
+            "message": "Üzgünüm, isteğinizi şu anda işleyemedim. Lütfen tekrar dener misiniz?"
+        }
 
     parsed['_raw_response'] = raw_response
     parsed['_prompt'] = prompt
@@ -258,7 +277,13 @@ def chat():
     # =========================================================================
 
     # JSON-RPC ile tools/list
-    tools = get_tools_from_mcp()
+    try:
+        tools = get_tools_from_mcp()
+    except Exception:
+        return jsonify({
+            'type': 'message',
+            'message': 'Şu anda servislerle bağlantı kurulamıyor. Lütfen biraz sonra tekrar deneyin.'
+        })
 
     llm_response = ask_llm(user_message, tools)
 
@@ -316,13 +341,19 @@ def proxy_sse(task_id):
     def generate():
         print(f'[AGENT] SSE proxy started for task {task_id}')
 
-        response = requests.get(f'{MCP_SERVER}/sse/{task_id}', stream=True)
-
-        for line in response.iter_lines():
-            if line:
-                decoded = line.decode('utf-8')
-                print(f'[AGENT] SSE event received: {decoded[:50]}...')
-                yield decoded + '\n\n'
+        try:
+            response = requests.get(f'{MCP_SERVER}/sse/{task_id}', stream=True, timeout=30)
+            for line in response.iter_lines():
+                if line:
+                    decoded = line.decode('utf-8')
+                    print(f'[AGENT] SSE event received: {decoded[:50]}...')
+                    yield decoded + '\n\n'
+        except Exception as err:
+            error_payload = json.dumps({
+                "type": "error",
+                "message": f"SSE bağlantı hatası: {str(err)}"
+            })
+            yield f"data: {error_payload}\n\n"
 
         print(f'[AGENT] SSE proxy ended for task {task_id}')
 

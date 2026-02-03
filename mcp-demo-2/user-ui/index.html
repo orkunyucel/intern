@@ -686,6 +686,9 @@ Port: 3000 (server.js ile serve ediliyor)
       // flow.md'ye göre: UI → Agent → MCP Server (Agent proxy yapıyor)
       const eventSource = new EventSource(`${AGENT_URL}/sse/${taskId}`);
 
+      // Bağlantı koparsa kullanıcıya bilgi ver
+      let reconnectNotified = false;
+
       // Her SSE event'i için çağrılır
       eventSource.onmessage = (event) => {
         // JSON parse et
@@ -765,6 +768,10 @@ Port: 3000 (server.js ile serve ediliyor)
           // Bağlantıyı kapat
           eventSource.close();
         }
+        else if (data.type === 'ping') {
+          // Heartbeat - kullanıcıya gösterme
+          return;
+        }
         else if (data.type === 'error') {
           // Hata
           addMessage('Hata: ' + data.message, 'bot');
@@ -779,6 +786,10 @@ Port: 3000 (server.js ile serve ediliyor)
         const bandwidthEl = document.getElementById('bandwidthValue');
         bandwidthEl.classList.remove('updating');
         addFlowStep('SSE', 'Bağlantı kapandı', null, 'sse');
+        if (!reconnectNotified) {
+          addMessage('Bağlantı koptu, tekrar bağlanılıyor...', 'bot');
+          reconnectNotified = true;
+        }
         eventSource.close();
       };
     }

@@ -92,3 +92,9 @@ GEMINI_API_KEY=your_gemini_api_key
 ⑬ MCP → Agent → UI: SSE (SUCCESS)
 ⑭ Task done
 ```
+
+## İyileştirme Notları (İleriye Dönük)
+
+POC kapsamında zorunlu değildir; ileride ürünleştirme için önerilen başlıklar:
+
+- **Resource Cleanup:** `tasks` storage temizlenmiyor. Uzun süreli kullanımda bellek şişmesini önlemek için TTL ve durum bazlı temizlik politikası eklenmeli (ör. DONE/ERROR sonrası kısa süre, TIMEOUT sonrası kısa süre).

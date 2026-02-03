@@ -304,6 +304,15 @@ async function executeToolAsync(taskId, toolName, args) {
         })
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        sendSSE(taskId, {
+          type: 'error',
+          message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`
+        });
+        return;
+      }
+
       const data = await response.json();
 
       // ⑩ CAMARA API'den 201 Created alındı
@@ -353,6 +362,12 @@ async function executeToolAsync(taskId, toolName, args) {
           userMessage: 'Hız artırımı bulunamadı.',
           result: { error: 'Session not found' }
         });
+      } else if (!response.ok) {
+        const errorText = await response.text();
+        sendSSE(taskId, {
+          type: 'error',
+          message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`
+        });
       } else {
         const data = await response.json();
         const statusText = data.qosStatus === 'AVAILABLE' ? 'aktif' : 'işleniyor';
@@ -384,6 +399,12 @@ async function executeToolAsync(taskId, toolName, args) {
           userMessage: 'Hız artırımı bulunamadı veya zaten sonlandırılmış.',
           result: { error: 'Session not found' }
         });
+      } else if (!response.ok && response.status !== 204) {
+        const errorText = await response.text();
+        sendSSE(taskId, {
+          type: 'error',
+          message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`
+        });
       } else {
         sendSSE(taskId, {
           type: 'complete',
@@ -403,9 +424,19 @@ async function executeToolAsync(taskId, toolName, args) {
   else if (toolName === 'get_network_context') {
     try {
       const response = await fetch(`${CAMARA_API}/network-context`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        sendSSE(taskId, {
+          type: 'error',
+          message: `CAMARA API hata: ${response.status} ${response.statusText} - ${errorText}`
+        });
+        return;
+      }
+
       const data = await response.json();
 
-      const activeText = data.activeSession
+      const activeText = data.activeSessions > 0
         ? 'Şu anda hız artırımınız aktif.'
         : 'Şu anda normal hızda bağlısınız.';
 
@@ -537,8 +568,15 @@ app.get('/sse/:taskId', (req, res) => {
 
   res.write(`data: ${JSON.stringify({ type: 'connected', taskId })}\n\n`);
 
+  const heartbeat = setInterval(() => {
+    if (sseConnections.get(taskId)) {
+      res.write(`data: ${JSON.stringify({ type: 'ping', taskId })}\n\n`);
+    }
+  }, 15000);
+
   req.on('close', () => {
     console.log(`[MCP] SSE connection closed for task ${taskId}`);
+    clearInterval(heartbeat);
     sseConnections.delete(taskId);
   });
 });
