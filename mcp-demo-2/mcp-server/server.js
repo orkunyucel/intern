@@ -232,16 +232,16 @@ app.post('/rpc', async (req, res) => {
         taskId,
         tool: name,
         arguments: args,
-        status: 'WORKING',
+        status: 'ACCEPTED',  // HTTP response için - SSE'de WORKING kullanılır
         createdAt: new Date().toISOString()
       });
 
-      // HEMEN taskId ile response döner
+      // HEMEN taskId ile response döner - ACCEPTED = işlem kabul edildi, SSE'den takip et
       res.json({
         jsonrpc: '2.0',
         result: {
           taskId,
-          status: 'WORKING'
+          status: 'ACCEPTED'  // SSE değil, HTTP response
         },
         id
       });
@@ -276,7 +276,7 @@ async function executeToolAsync(taskId, toolName, args) {
         currentBandwidth: '0 Mbps'
       });
 
-      await sleep(1500);
+      await sleep(1500); // network tarafı için
 
       // ⑨ CAMARA API'ye istek gönderiliyor
       const camaraRequestBody = {
