@@ -493,7 +493,13 @@ async function executeToolAsync(taskId, toolName, args) {
   else if (toolName === 'get_network_context') {
     try {
       const camaraUrl = `${CAMARA_API}/network-context`;
-      const response = await fetch(camaraUrl);
+
+      // Timeout ile fetch (hang engellemek için)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(camaraUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();

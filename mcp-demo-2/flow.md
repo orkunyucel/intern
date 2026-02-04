@@ -1,6 +1,6 @@
 USER (Chat UI)     CLIENT (Agent)        LLM        MCP SERVER        CAMARA API
     |                    |               |              |               |
-    | ① "700 yap"        |               |              |               |
+    | ① "user question" |               |              |               |
     |------------------->|               |              |               |
     |                    | ② tool list   |              |               |
     |                    |----------------------------->|               |
