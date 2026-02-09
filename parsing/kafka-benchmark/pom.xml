@@ -1,0 +1,42 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.benchmark</groupId>
+  <artifactId>kafka-benchmark</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <name>Kafka Benchmark</name>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <kafka.clients.version>3.7.0</kafka.clients.version>
+    <avro.version>1.11.3</avro.version>
+    <protobuf.version>3.25.1</protobuf.version>
+  </properties>
+
+  <modules>
+    <module>shared-model</module>
+    <module>scenarios/01-oldschool-pipe</module>
+    <module>scenarios/02-avro-reader-schema</module>
+    <module>scenarios/03-protobuf-selective-parse</module>
+  </modules>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.11.0</version>
+          <configuration>
+            <release>${maven.compiler.release}</release>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>
