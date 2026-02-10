@@ -1,0 +1,103 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: avp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "42181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: avp-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "49092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+
+  pipe-producer:
+    build:
+      context: ..
+      dockerfile: docker/java-app.Dockerfile
+    container_name: avp-pipe-producer
+    depends_on:
+      - kafka
+    environment:
+      APP_CASE: pipe
+      APP_ROLE: producer
+      BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_NAME: ${PIPE_TOPIC_NAME:-RAW_PIPE}
+      RECORD_COUNT: ${RECORD_COUNT:-1000000}
+      METRICS_DIR: /logs/runs/${RUN_ID:-manual}
+      POLL_TIMEOUT_MS: ${POLL_TIMEOUT_MS:-200}
+      PHASE_METRICS_ENABLED: ${PHASE_METRICS_ENABLED:-true}
+    volumes:
+      - ../logs:/logs
+
+  pipe-consumer-1:
+    build:
+      context: ..
+      dockerfile: docker/java-app.Dockerfile
+    container_name: avp-pipe-consumer-1
+    depends_on:
+      - kafka
+    environment:
+      APP_CASE: pipe
+      APP_ROLE: consumer-1
+      BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_NAME: ${PIPE_TOPIC_NAME:-RAW_PIPE}
+      RECORD_COUNT: ${RECORD_COUNT:-1000000}
+      METRICS_DIR: /logs/runs/${RUN_ID:-manual}
+      POLL_TIMEOUT_MS: ${POLL_TIMEOUT_MS:-200}
+      PHASE_METRICS_ENABLED: ${PHASE_METRICS_ENABLED:-true}
+    volumes:
+      - ../logs:/logs
+
+  avro-producer:
+    build:
+      context: ..
+      dockerfile: docker/java-app.Dockerfile
+    container_name: avp-avro-producer
+    depends_on:
+      - kafka
+    environment:
+      APP_CASE: avro
+      APP_ROLE: producer
+      BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_NAME: ${AVRO_TOPIC_NAME:-AVRO_FULL}
+      RECORD_COUNT: ${RECORD_COUNT:-1000000}
+      METRICS_DIR: /logs/runs/${RUN_ID:-manual}
+      POLL_TIMEOUT_MS: ${POLL_TIMEOUT_MS:-200}
+      PHASE_METRICS_ENABLED: ${PHASE_METRICS_ENABLED:-true}
+    volumes:
+      - ../logs:/logs
+
+  avro-consumer-1:
+    build:
+      context: ..
+      dockerfile: docker/java-app.Dockerfile
+    container_name: avp-avro-consumer-1
+    depends_on:
+      - kafka
+    environment:
+      APP_CASE: avro
+      APP_ROLE: consumer-1
+      BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_NAME: ${AVRO_TOPIC_NAME:-AVRO_FULL}
+      RECORD_COUNT: ${RECORD_COUNT:-1000000}
+      METRICS_DIR: /logs/runs/${RUN_ID:-manual}
+      POLL_TIMEOUT_MS: ${POLL_TIMEOUT_MS:-200}
+      PHASE_METRICS_ENABLED: ${PHASE_METRICS_ENABLED:-true}
+    volumes:
+      - ../logs:/logs

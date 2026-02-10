@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "TestRecord",
+  "namespace": "com.benchmark.model",
+  "fields": [
+    {"name": "int_5", "type": "int"},
+    {"name": "int_13", "type": "int"},
+    {"name": "int_19", "type": "int"},
+    {"name": "int_25", "type": "int"},
+    {"name": "long_9", "type": "long"},
+    {"name": "long_46", "type": "long"},
+    {"name": "long_50", "type": "long"},
+    {"name": "str_1", "type": "string"},
+    {"name": "str_53", "type": "string"},
+    {"name": "str_81", "type": "string"}
+  ]
+}
