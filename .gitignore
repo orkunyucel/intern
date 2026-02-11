@@ -31,6 +31,8 @@ dependency-reduced-pom.xml
 ############################
 *.log
 logs/
+!parsing/avro-vs-pipe/logs/
+!parsing/kafka-benchmark/**/logs/
 *.out
 
 ############################

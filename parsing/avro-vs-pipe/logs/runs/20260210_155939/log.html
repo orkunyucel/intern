@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipe vs Avro Benchmark</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0f;
+    --surface: #12141a;
+    --surface2: #1a1d25;
+    --border: #22262f;
+    --text: #e4e6ec;
+    --dim: #6b7280;
+    --muted: #3d4350;
+    --pipe: #22d3ee;
+    --avro: #f472b6;
+    --green: #34d399;
+    --amber: #fbbf24;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 20px 60px; }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700;
+    background: linear-gradient(135deg, var(--pipe), var(--avro));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+  }
+  .sub { font-size: 13px; color: var(--dim); margin-bottom: 28px; }
+  .tags { display:flex; gap:10px; margin-bottom: 28px; flex-wrap:wrap; }
+  .tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 4px 10px;
+    border-radius: 5px; background: var(--surface); border: 1px solid var(--border); color: var(--dim);
+  }
+  .tag b { color: var(--text); }
+
+  .section-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--muted); margin-bottom: 14px;
+  }
+
+  /* Flow */
+  .flow-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px 20px; margin-bottom: 32px; overflow-x: auto;
+  }
+  .flow-row { display: flex; align-items: center; padding: 10px 0; }
+  .flow-row + .flow-row { margin-top: 8px; }
+  .flow-node {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+    padding: 8px 14px; border-radius: 7px; white-space: nowrap; text-align: center;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+  }
+  .flow-node.pipe-hl { border-color: rgba(34,211,238,0.3); background: rgba(34,211,238,0.06); }
+  .flow-node.avro-hl { border-color: rgba(244,114,182,0.3); background: rgba(244,114,182,0.06); }
+  .flow-arrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--muted);
+    padding: 0 10px;
+  }
+  .flow-legend { display: flex; justify-content: center; gap: 24px; margin-top: 14px; }
+  .flow-legend span { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); }
+  .fl-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* Hero */
+  .hero-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 32px; }
+  .hero-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; text-align: center;
+  }
+  .hero-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.7px; color: var(--muted); margin-bottom: 12px;
+  }
+  .hero-nums { display: flex; justify-content: center; gap: 20px; }
+  .hero-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 700; line-height: 1;
+  }
+  .hero-num .u { font-size: 11px; font-weight: 400; color: var(--dim); }
+  .hero-num small { display: block; font-size: 11px; font-weight: 500; color: var(--dim); margin-top: 4px; }
+  .hero-badge {
+    display: inline-block; margin-top: 10px; font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px;
+    background: rgba(34,211,238,0.1); color: var(--pipe); border: 1px solid rgba(34,211,238,0.2);
+  }
+
+  /* Bars */
+  .compare-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 32px;
+  }
+  .cmp-row { margin-bottom: 18px; }
+  .cmp-row:last-child { margin-bottom: 0; }
+  .cmp-header { display: flex; justify-content: space-between; margin-bottom: 7px; }
+  .cmp-label { font-size: 12px; font-weight: 600; color: var(--dim); }
+  .cmp-vals { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); }
+  .cmp-vals .p { color: var(--pipe); font-weight: 600; }
+  .cmp-vals .a { color: var(--avro); font-weight: 600; }
+  .cmp-track {
+    height: 22px; display: flex; gap: 3px;
+    background: var(--surface2); border-radius: 5px; overflow: hidden;
+  }
+  .cmp-bar {
+    height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+  }
+  .cmp-bar.pipe { background: rgba(34,211,238,0.3); color: var(--pipe); }
+  .cmp-bar.avro { background: rgba(244,114,182,0.3); color: var(--avro); }
+
+  /* Insights */
+  .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .insight {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px; border-left: 3px solid var(--pipe);
+  }
+  .insight.ai { border-left-color: var(--avro); }
+  .insight.wi { border-left-color: var(--amber); grid-column: span 2; }
+  .insight-t { font-size: 11px; font-weight: 600; margin-bottom: 6px; }
+  .insight-b { font-size: 12px; color: var(--dim); line-height: 1.6; }
+  .insight-b b { color: var(--text); }
+
+  @media (max-width: 640px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .insights { grid-template-columns: 1fr; }
+    .insight.wi { grid-column: span 1; }
+    .flow-row { flex-wrap: wrap; gap: 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Pipe vs Avro</h1>
+  <div class="sub">Kafka serialization benchmark — 1M records, shared broker</div>
+  <div class="tags">
+    <span class="tag">RUN <b>20260210_155939</b></span>
+    <span class="tag">RECORDS <b>1,000,000</b></span>
+    <span class="tag">KAFKA <b>shared</b></span>
+  </div>
+
+  <!-- Flow -->
+  <div class="section-label">Test Architecture</div>
+  <div class="flow-box">
+    <div class="flow-row">
+      <div class="flow-node">Map/Array<br>Object</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node pipe-hl">Pipe Encode</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node">RAW_PIPE<br><span style="font-size:9px;color:var(--dim)">Kafka</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node pipe-hl">Split 250 →<br>Parse 10</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node" style="border-color:rgba(52,211,153,0.3)">✓ E2E</div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-node">Map/Array<br>Object</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node avro-hl">Avro Encode</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node">AVRO_FULL<br><span style="font-size:9px;color:var(--dim)">Kafka</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node avro-hl">Schema Decode<br>→ Parse 10</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node" style="border-color:rgba(52,211,153,0.3)">✓ E2E</div>
+    </div>
+    <div class="flow-legend">
+      <span><div class="fl-dot" style="background:var(--pipe)"></div>Pipe (RAW)</span>
+      <span><div class="fl-dot" style="background:var(--avro)"></div>Avro (Full Schema)</span>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="hero-grid">
+    <div class="hero-card">
+      <div class="hero-label">End-to-End</div>
+      <div class="hero-nums">
+        <div class="hero-num" style="color:var(--pipe)">155<span class="u">s</span><small>Pipe</small></div>
+        <div class="hero-num" style="color:var(--avro)">160<span class="u">s</span><small>Avro</small></div>
+      </div>
+      <div class="hero-badge">Pipe −2.7%</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-label">Throughput</div>
+      <div class="hero-nums">
+        <div class="hero-num" style="color:var(--pipe)">6,434<span class="u">/s</span><small>Pipe</small></div>
+        <div class="hero-num" style="color:var(--avro)">6,265<span class="u">/s</span><small>Avro</small></div>
+      </div>
+      <div class="hero-badge">Pipe +2.7%</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-label">CPU Time</div>
+      <div class="hero-nums">
+        <div class="hero-num" style="color:var(--pipe)">132<span class="u">s</span><small>Pipe</small></div>
+        <div class="hero-num" style="color:var(--avro)">136<span class="u">s</span><small>Avro</small></div>
+      </div>
+      <div class="hero-badge">Pipe −3.3%</div>
+    </div>
+  </div>
+
+  <!-- Comparison -->
+  <div class="section-label">Where the Time Goes</div>
+  <div class="compare-card">
+    <div class="cmp-row">
+      <div class="cmp-header">
+        <span class="cmp-label">Producer Encode</span>
+        <span class="cmp-vals"><span class="p">3.2s</span> vs <span class="a">8.6s</span></span>
+      </div>
+      <div class="cmp-track">
+        <div class="cmp-bar pipe" style="width:27%;">3.2s</div>
+        <div class="cmp-bar avro" style="width:73%;">8.6s</div>
+      </div>
+    </div>
+    <div class="cmp-row">
+      <div class="cmp-header">
+        <span class="cmp-label">Producer → Topic Write</span>
+        <span class="cmp-vals"><span class="p">151s</span> vs <span class="a">150s</span></span>
+      </div>
+      <div class="cmp-track">
+        <div class="cmp-bar pipe" style="width:50.2%;">151s</div>
+        <div class="cmp-bar avro" style="width:49.8%;">150s</div>
+      </div>
+    </div>
+    <div class="cmp-row">
+      <div class="cmp-header">
+        <span class="cmp-label">Consumer Decode / Split</span>
+        <span class="cmp-vals"><span class="p">4.2s</span> vs <span class="a">2.9s</span></span>
+      </div>
+      <div class="cmp-track">
+        <div class="cmp-bar pipe" style="width:59%;">4.2s</div>
+        <div class="cmp-bar avro" style="width:41%;">2.9s</div>
+      </div>
+    </div>
+    <div class="cmp-row">
+      <div class="cmp-header">
+        <span class="cmp-label">Consumer Parse Selected</span>
+        <span class="cmp-vals"><span class="p">2.4s</span> vs <span class="a">0.3s</span></span>
+      </div>
+      <div class="cmp-track">
+        <div class="cmp-bar pipe" style="width:90%;">2.4s</div>
+        <div class="cmp-bar avro" style="width:10%;">0.3s</div>
+      </div>
+    </div>
+    <div class="cmp-row">
+      <div class="cmp-header">
+        <span class="cmp-label">Consumer Total</span>
+        <span class="cmp-vals"><span class="p">6.6s</span> vs <span class="a">3.2s</span></span>
+      </div>
+      <div class="cmp-track">
+        <div class="cmp-bar pipe" style="width:67%;">6.6s</div>
+        <div class="cmp-bar avro" style="width:33%;">3.2s</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Insights -->
+  <div class="section-label">Insights</div>
+  <div class="insights">
+    <div class="insight">
+      <div class="insight-t" style="color:var(--pipe)">Pipe Encode 2.67× Hızlı</div>
+      <div class="insight-b">Encoding farkı (3.2s vs 8.6s) Pipe'ın E2E avantajının ana kaynağı. Topic write her ikisinde ~150s.</div>
+    </div>
+    <div class="insight ai">
+      <div class="insight-t" style="color:var(--avro)">Avro Consumer 2× Hızlı</div>
+      <div class="insight-b">Avro consumer <b>3.2s</b>, Pipe <b>6.6s</b>. Selective parse <b>8.7× hızlı</b> (0.3s vs 2.4s).</div>
+    </div>
+    <div class="insight wi">
+      <div class="insight-t" style="color:var(--amber)">Darboğaz: Kafka I/O ~150s (%97)</div>
+      <div class="insight-b">Her iki senaryoda da sürenin büyük bölümü topic write'a gidiyor. Encode/decode farkları net sonucu belirliyor ama asıl optimizasyon fırsatı Kafka I/O katmanında.</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
