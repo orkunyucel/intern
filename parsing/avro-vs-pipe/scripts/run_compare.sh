@@ -113,7 +113,6 @@ export POLL_TIMEOUT_MS
 export PIPE_TOPIC_NAME
 export AVRO_TOPIC_NAME
 
-rm -rf "$RUNS_DIR"
 mkdir -p "$RUNS_DIR/$RUN_ID"
 rm -f "$LOG_DIR/compare_summary.kv" "$LOG_DIR/compare_flow.md"
 
