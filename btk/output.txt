@@ -1,0 +1,171 @@
+============================================================
+  checkCpSenderAddressValidity TEST SONUCLARI
+============================================================
+No    | Input                | Sonuc   
+------------------------------------------------------------
+------------------------------------------------------------
+  ========== KATEGORI 1: UZUNLUK KONTROLU (HARF) ==========
+------------------------------------------------------------
+1     | "AB"                 | INVALID 
+2     | "A"                  | INVALID 
+3     | "XY"                 | INVALID 
+4     | "ABCDEFGHIJKL"       | INVALID 
+5     | "ABCDEFGHIJKLM"      | INVALID 
+6     | "123456789012"       | INVALID 
+7     | "ThisIsTooLong"      | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 2: GECERLI UZUNLUK (HARF) ==========
+------------------------------------------------------------
+8     | "ABC"                | VALID   
+9     | "Hello"              | VALID   
+10    | "BTK"                | VALID   
+11    | "ABCDEFGHIJK"        | VALID   
+12    | "Hello World"        | VALID   
+------------------------------------------------------------
+  ========== KATEGORI 3: BAS/SON/CIFT BOSLUK ==========
+------------------------------------------------------------
+13    | " ABC"               | INVALID 
+14    | " Hello"             | INVALID 
+15    | "ABC "               | INVALID 
+16    | "Test "              | INVALID 
+17    | " AB "               | INVALID 
+18    | "  Hi"               | INVALID 
+19    | "AB  CD"             | INVALID 
+20    | "Hello  World"       | INVALID 
+21    | "Test  1"            | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 4: 1 BASAMAKLI SAYILAR (GECERSIZ - Uzunluk != 3) ==========
+------------------------------------------------------------
+22    | "0"                  | INVALID 
+23    | "1"                  | INVALID 
+24    | "5"                  | INVALID 
+25    | "9"                  | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 5: 2 BASAMAKLI SAYILAR (GECERSIZ - Uzunluk != 3) ==========
+------------------------------------------------------------
+26    | "10"                 | INVALID 
+27    | "11"                 | INVALID 
+28    | "55"                 | INVALID 
+29    | "99"                 | INVALID 
+30    | "00"                 | INVALID 
+31    | "01"                 | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 6: 3 BASAMAKLI (100-109 ARASI) (GECERSIZ - 2. rakam 0) ==========
+------------------------------------------------------------
+32    | "100"                | INVALID 
+33    | "101"                | INVALID 
+34    | "102"                | INVALID 
+35    | "103"                | INVALID 
+36    | "104"                | INVALID 
+37    | "105"                | INVALID 
+38    | "106"                | INVALID 
+39    | "107"                | INVALID 
+40    | "108"                | INVALID 
+41    | "109"                | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 7: 3 BASAMAKLI (110-199 ARASI) (GECERLI - 1 ile basliyor, 2. rakam 0 degil) ==========
+------------------------------------------------------------
+42    | "110"                | VALID   
+43    | "111"                | VALID   
+44    | "115"                | VALID   
+45    | "119"                | VALID   
+46    | "120"                | VALID   
+47    | "125"                | VALID   
+48    | "130"                | VALID   
+49    | "140"                | VALID   
+50    | "150"                | VALID   
+51    | "160"                | VALID   
+52    | "170"                | VALID   
+53    | "180"                | VALID   
+54    | "190"                | VALID   
+55    | "195"                | VALID   
+56    | "199"                | VALID   
+------------------------------------------------------------
+  ========== KATEGORI 8: 3 BASAMAKLI (200-999 ARASI) (GECERSIZ - 1 ile baslamiyor) ==========
+------------------------------------------------------------
+57    | "200"                | INVALID 
+58    | "201"                | INVALID 
+59    | "210"                | INVALID 
+60    | "222"                | INVALID 
+61    | "300"                | INVALID 
+62    | "333"                | INVALID 
+63    | "400"                | INVALID 
+64    | "500"                | INVALID 
+65    | "555"                | INVALID 
+66    | "600"                | INVALID 
+67    | "700"                | INVALID 
+68    | "800"                | INVALID 
+69    | "888"                | INVALID 
+70    | "900"                | INVALID 
+71    | "999"                | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 9: 4 BASAMAKLI SAYILAR (GECERSIZ - Uzunluk != 3) ==========
+------------------------------------------------------------
+72    | "1000"               | INVALID 
+73    | "1100"               | INVALID 
+74    | "1234"               | INVALID 
+75    | "1999"               | INVALID 
+76    | "2000"               | INVALID 
+77    | "5555"               | INVALID 
+78    | "9999"               | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 10: 5 BASAMAKLI SAYILAR (GECERSIZ - Uzunluk != 3) ==========
+------------------------------------------------------------
+79    | "10000"              | INVALID 
+80    | "12345"              | INVALID 
+81    | "54321"              | INVALID 
+82    | "99999"              | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 11: OZEL KARAKTER ICEREN ==========
+------------------------------------------------------------
+83    | "Hello!"             | INVALID 
+84    | "Test@1"             | INVALID 
+85    | "ABC#D"              | INVALID 
+86    | "Hi&Bye"             | INVALID 
+87    | "Name_1"             | INVALID 
+88    | "100%"               | INVALID 
+89    | "A+B"                | INVALID 
+90    | "C/D"                | INVALID 
+91    | "test.com"           | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 12: SADECE SUPELI KARAKTERLER ==========
+------------------------------------------------------------
+92    | "OoIlE"              | INVALID 
+93    | "OIl"                | INVALID 
+94    | "OoIlEASsbTBqg"      | INVALID 
+95    | "sBqg"               | INVALID 
+96    | "OoIlEASsbTBqg0"     | INVALID 
+97    | "Oo0"                | INVALID 
+98    | "ASsb"               | INVALID 
+------------------------------------------------------------
+  ========== KATEGORI 13: GECERLI ALFANUMERIK ORNEKLER ==========
+------------------------------------------------------------
+99    | "BTK"                | VALID   
+100   | "Merhaba"            | VALID   
+101   | "Test 1"             | VALID   
+102   | "Xyz 99"             | VALID   
+103   | "KOD"                | VALID   
+104   | "Turkcell"           | VALID   
+105   | "Vodafone"           | VALID   
+------------------------------------------------------------
+  ========== KATEGORI 14: SPOOF / BENZER KARAKTERLER (Orn: B4NK4, g00gle, ll2) ==========
+------------------------------------------------------------
+106   | "B4NK4"              | VALID   
+107   | "g00gle"             | VALID   
+108   | "FAC3B00K"           | VALID   
+109   | "ll2"                | INVALID 
+110   | "1l2"                | INVALID 
+111   | "PayPa1"             | VALID   
+112   | "0range"             | VALID   
+113   | "P0LIS"              | VALID   
+114   | "HUKUK"              | VALID   
+115   | "ll2"                | INVALID 
+116   | "l12"                | INVALID 
+117   | "112"                | VALID   
+118   | "lI2"                | INVALID 
+119   | "G0V"                | VALID   
+120   | "Svc"                | VALID   
+121   | "M3S4J"              | VALID   
+122   | "bEE"                | INVALID 
+============================================================
+Toplam test: 122

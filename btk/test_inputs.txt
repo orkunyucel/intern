@@ -1,0 +1,149 @@
+# ========== KATEGORI 1: UZUNLUK KONTROLU (HARF) ==========
+AB
+A
+XY
+ABCDEFGHIJKL
+ABCDEFGHIJKLM
+123456789012
+ThisIsTooLong
+
+# ========== KATEGORI 2: GECERLI UZUNLUK (HARF) ==========
+ABC
+Hello
+BTK
+ABCDEFGHIJK
+Hello World
+
+# ========== KATEGORI 3: BAS/SON/CIFT BOSLUK ==========
+ ABC
+ Hello
+ABC 
+Test 
+ AB 
+  Hi
+AB  CD
+Hello  World
+Test  1
+
+# ========== KATEGORI 4: 1 BASAMAKLI SAYILAR (GECERSIZ - Uzunluk != 3) ==========
+0
+1
+5
+9
+
+# ========== KATEGORI 5: 2 BASAMAKLI SAYILAR (GECERSIZ - Uzunluk != 3) ==========
+10
+11
+55
+99
+00
+01
+
+# ========== KATEGORI 6: 3 BASAMAKLI (100-109 ARASI) (GECERSIZ - 2. rakam 0) ==========
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+
+# ========== KATEGORI 7: 3 BASAMAKLI (110-199 ARASI) (GECERLI - 1 ile basliyor, 2. rakam 0 degil) ==========
+110
+111
+115
+119
+120
+125
+130
+140
+150
+160
+170
+180
+190
+195
+199
+
+# ========== KATEGORI 8: 3 BASAMAKLI (200-999 ARASI) (GECERSIZ - 1 ile baslamiyor) ==========
+200
+201
+210
+222
+300
+333
+400
+500
+555
+600
+700
+800
+888
+900
+999
+
+# ========== KATEGORI 9: 4 BASAMAKLI SAYILAR (GECERSIZ - Uzunluk != 3) ==========
+1000
+1100
+1234
+1999
+2000
+5555
+9999
+
+# ========== KATEGORI 10: 5 BASAMAKLI SAYILAR (GECERSIZ - Uzunluk != 3) ==========
+10000
+12345
+54321
+99999
+
+# ========== KATEGORI 11: OZEL KARAKTER ICEREN ==========
+Hello!
+Test@1
+ABC#D
+Hi&Bye
+Name_1
+100%
+A+B
+C/D
+test.com
+
+# ========== KATEGORI 12: SADECE SUPELI KARAKTERLER ==========
+OoIlE
+OIl
+OoIlEASsbTBqg
+sBqg
+OoIlEASsbTBqg0
+Oo0
+ASsb
+
+# ========== KATEGORI 13: GECERLI ALFANUMERIK ORNEKLER ==========
+BTK
+Merhaba
+Test 1
+Xyz 99
+KOD
+Turkcell
+Vodafone
+
+# ========== KATEGORI 14: SPOOF / BENZER KARAKTERLER (Orn: B4NK4, g00gle, ll2) ==========
+B4NK4
+g00gle
+FAC3B00K
+ll2
+1l2
+PayPa1
+0range
+P0LIS
+HUKUK
+ll2
+l12
+112
+lI2
+G0V
+Svc
+M3S4J
+bEE
