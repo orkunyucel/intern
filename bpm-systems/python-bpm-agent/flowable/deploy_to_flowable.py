@@ -225,7 +225,7 @@ def main():
      -u admin:test \\
      -H "Content-Type: application/json" \\
      -d '{{
-       "processDefinitionKey": "langgraphAIIntakeProcess",
+       "processDefinitionKey": "advancedIntakeProcess",
        "variables": [
          {{"name": "question", "value": "BPM politikasında izin süreci nasıl işler?"}},
          {{"name": "customerId", "value": "CUST-001"}},

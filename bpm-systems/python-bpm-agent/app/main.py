@@ -469,7 +469,7 @@ async def start_flowable_process(request: IntakeRequest):
         flowable_pass = os.getenv("FLOWABLE_PASS", "test")
 
         process_payload = {
-            "processDefinitionKey": "langgraphAIIntakeProcess",
+            "processDefinitionKey": "advancedIntakeProcess",
             "variables": [
                 {"name": "question", "value": request.text},
                 {"name": "customerId", "value": request.customer_id},

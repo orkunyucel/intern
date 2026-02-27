@@ -29,6 +29,29 @@
         .badge-high { background: #f59e0b; }
         .badge-medium { background: #3b82f6; }
         .badge-low { background: #10b981; }
+        .btn-flowable {
+            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-flowable:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+        }
+        .flowable-link {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .flowable-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+        }
+        .pulse-dot {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
         .loading {
             border: 3px solid #f3f4f6;
             border-top: 3px solid #667eea;
@@ -66,7 +89,7 @@
     <!-- Main Container -->
     <div class="container mx-auto px-6 pb-12">
         <!-- Stats Bar -->
-        <div class="grid grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-4 gap-6 mb-8">
             <div class="bg-white rounded-xl p-6 card-shadow">
                 <div class="flex items-center justify-between">
                     <div>
@@ -94,6 +117,15 @@
                     <div class="text-4xl">✅</div>
                 </div>
             </div>
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Flowable BPM</p>
+                        <p id="flowable-status" class="text-2xl font-bold text-gray-400">○</p>
+                    </div>
+                    <div class="text-4xl">⚙️</div>
+                </div>
+            </div>
         </div>
 
         <!-- Tabs -->
@@ -107,6 +139,9 @@
                 </button>
                 <button onclick="switchTab('upload')" id="tab-upload" class="px-6 py-4 font-semibold text-gray-500">
                     📁 Upload Real Call
+                </button>
+                <button onclick="switchTab('flowable')" id="tab-flowable" class="px-6 py-4 font-semibold text-gray-500">
+                    🚀 Flowable Entegrasyon
                 </button>
             </div>
         </div>
@@ -186,6 +221,80 @@
         <div id="upload-content" class="hidden">
             <!-- Content populated by audio-uploader.js -->
         </div>
+
+        <!-- Flowable Integration Tab -->
+        <div id="flowable-content" class="hidden">
+            <div class="grid grid-cols-2 gap-8">
+                <!-- Left: Input -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-xl p-6 card-shadow">
+                        <h2 class="text-xl font-bold mb-4 flex items-center">
+                            <span class="mr-2">🚀</span> Flowable'a Talep Gönder
+                        </h2>
+                        <p class="text-sm text-gray-500 mb-4">Bir müşteri talebi yazın. AI analiz edecek ve Flowable BPM'de süreç başlatacak.</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-1">Müşteri Talebi</label>
+                                <textarea id="flowable-text" rows="4" class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors" placeholder="Örn: 3 gündür internetim yok, acil yardım istiyorum!"></textarea>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Müşteri ID</label>
+                                    <input id="flowable-customer" type="text" value="CUST-DEMO-001" class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Kaynak</label>
+                                    <select id="flowable-source" class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors">
+                                        <option value="text">📝 Text</option>
+                                        <option value="phone">📞 Phone</option>
+                                        <option value="email">📧 Email</option>
+                                        <option value="form">📋 Form</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button onclick="sendToFlowable()" id="flowable-submit-btn" class="w-full btn-flowable text-white font-bold py-3 px-6 rounded-lg text-lg">
+                                🚀 AI Analiz Et & Flowable'a Gönder
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Scenarios -->
+                    <div class="bg-white rounded-xl p-6 card-shadow">
+                        <h3 class="text-sm font-bold text-gray-600 mb-3">⚡ Hızlı Test Senaryoları</h3>
+                        <div class="space-y-2">
+                            <button onclick="fillFlowableScenario('3 gündür internetim yok, iş yapamıyorum, çok sinirliyim!', 'phone')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all text-sm">
+                                🔴 <strong>URGENT:</strong> İnternet kesintisi (sinirli müşteri)
+                            </button>
+                            <button onclick="fillFlowableScenario('Faturamda yanlış bir tutar var, düzeltilmesini istiyorum.', 'email')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-yellow-400 hover:bg-yellow-50 transition-all text-sm">
+                                🟠 <strong>MEDIUM:</strong> Fatura hatası
+                            </button>
+                            <button onclick="fillFlowableScenario('Yıllık izin talebimi iletmek istiyorum, 5-10 Mart arası.', 'form')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-green-400 hover:bg-green-50 transition-all text-sm">
+                                🟢 <strong>LOW:</strong> İzin talebi
+                            </button>
+                            <button onclick="fillFlowableScenario('Sunucu tamamen çöktü, hiçbir sistem çalışmıyor, tüm ekip bekliyor!', 'phone')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all text-sm">
+                                🔴 <strong>URGENT:</strong> Sunucu çökmesi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Results -->
+                <div>
+                    <div class="bg-white rounded-xl p-6 card-shadow">
+                        <h2 class="text-xl font-bold mb-4 flex items-center">
+                            <span class="mr-2">📊</span> Flowable Entegrasyon Sonucu
+                        </h2>
+                        <div id="flowable-results">
+                            <div class="text-center py-16 text-gray-400">
+                                <div class="text-6xl mb-4">⚙️</div>
+                                <p class="text-lg">Bir talep yazın ve Flowable'a gönderin</p>
+                                <p class="text-sm mt-2">AI analiz edecek → Flowable'da süreç başlatılacak → Task oluşacak</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -197,7 +306,7 @@
             currentTab = tab;
 
             // Reset all tabs
-            const tabs = ['text', 'call', 'upload'];
+            const tabs = ['text', 'call', 'upload', 'flowable'];
             tabs.forEach(t => {
                 const tabBtn = document.getElementById(`tab-${t}`);
                 const content = document.getElementById(`${t}-content`);
@@ -574,14 +683,176 @@
             }
         }
 
+        // Fill flowable scenario
+        function fillFlowableScenario(text, source) {
+            document.getElementById('flowable-text').value = text;
+            document.getElementById('flowable-source').value = source;
+        }
+
+        // Send to Flowable
+        async function sendToFlowable() {
+            const text = document.getElementById('flowable-text').value.trim();
+            const customerId = document.getElementById('flowable-customer').value.trim();
+            const source = document.getElementById('flowable-source').value;
+
+            if (!text) {
+                alert('Lütfen bir müşteri talebi yazın!');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('flowable-results');
+            const submitBtn = document.getElementById('flowable-submit-btn');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ İşleniyor...';
+
+            resultsDiv.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="loading mx-auto mb-4"></div>
+                    <p class="text-gray-600 font-semibold">AI Analiz & Flowable Entegrasyon...</p>
+                    <p class="text-sm text-gray-500 mt-2">Sentiment → Embedding → RAG → LLM → Flowable Process Start</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/flowable/start-process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: text,
+                        customer_id: customerId,
+                        source: source,
+                        sentiment: 'neutral'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Flowable bağlantı hatası');
+                }
+
+                testsRun++;
+                document.getElementById('tests-run').textContent = testsRun;
+
+                const priorityColors = {
+                    'URGENT': 'badge-urgent',
+                    'HIGH': 'badge-high',
+                    'MEDIUM': 'badge-medium',
+                    'LOW': 'badge-low'
+                };
+
+                const decision = result.ai_decision;
+                const pColor = priorityColors[decision.priority] || 'badge-medium';
+
+                resultsDiv.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="p-4 bg-green-50 rounded-lg border-2 border-green-300">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-2xl">✅</span>
+                                <span class="text-lg font-bold text-green-700">Flowable Süreç Başlatıldı!</span>
+                            </div>
+                            <p class="text-sm text-green-600">Process ID: <code class="bg-green-100 px-2 py-1 rounded font-mono">${result.flowable_process_id}</code></p>
+                        </div>
+
+                        <a href="${result.flowable_process_url}" target="_blank" class="block flowable-link text-white font-bold py-3 px-6 rounded-lg text-center text-lg">
+                            🔗 Flowable Task App'te Görüntüle →
+                        </a>
+
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p class="text-xs text-gray-500 font-semibold mb-2">📝 GİRDİ</p>
+                            <p class="text-gray-800">"${text}"</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <p class="text-xs text-purple-600 font-semibold mb-2">CATEGORY</p>
+                                <p class="text-lg font-bold">${decision.category}</p>
+                            </div>
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <p class="text-xs text-purple-600 font-semibold mb-2">PRIORITY</p>
+                                <span class="${pColor} text-white px-3 py-1 rounded-full text-sm font-bold">${decision.priority}</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="text-xs text-blue-600 font-semibold mb-2">🎯 INTENT</p>
+                            <p class="text-gray-800">${decision.intent}</p>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p class="text-xs text-gray-600 font-semibold mb-2">🧠 AI REASONING</p>
+                            <p class="text-sm text-gray-700 leading-relaxed">${decision.reasoning}</p>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-lg ${decision.auto_approve ? 'bg-green-50' : 'bg-yellow-50'}">
+                            <span class="font-semibold ${decision.auto_approve ? 'text-green-700' : 'text-yellow-700'}">
+                                ${decision.auto_approve ? '✅ Auto-Approved' : '⚠️ Manual Review Required'}
+                            </span>
+                        </div>
+
+                        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <p class="text-xs text-blue-800">
+                                <strong>💡 Demo İpucu:</strong> Şimdi <a href="http://localhost:8080/flowable-task" target="_blank" class="underline font-semibold">Flowable Task App</a>'i açın. 
+                                AI'nın belirlediği önceliğe göre (${decision.priority}) ilgili ekibe atanmış task'ı göreceksiniz.
+                            </p>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="text-6xl mb-4">❌</div>
+                        <p class="text-red-600 font-semibold mb-2">Hata Oluştu</p>
+                        <p class="text-sm text-gray-600 mb-4">${error.message}</p>
+                        <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-200 text-left">
+                            <p class="text-xs text-yellow-800">
+                                <strong>💡 Kontrol Edin:</strong><br>
+                                1. Flowable çalışıyor mu? → <code>docker-compose up -d flowable</code><br>
+                                2. BPMN deploy edildi mi? → <code>python flowable/deploy_to_flowable.py</code><br>
+                                3. Flowable UI: <a href="http://localhost:8080/flowable-task" target="_blank" class="underline">localhost:8080</a>
+                            </p>
+                        </div>
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 AI Analiz Et & Flowable\'a Gönder';
+            }
+        }
+
+        // Check Flowable status
+        async function checkFlowableStatus() {
+            try {
+                const response = await fetch('/api/flowable/start-process', { method: 'OPTIONS' }).catch(() => null);
+                // Try to reach Flowable through our backend health
+                const healthResp = await fetch('/api/health');
+                const health = await healthResp.json();
+                const statusEl = document.getElementById('flowable-status');
+                if (health.flowable && health.flowable.status === 'connected') {
+                    statusEl.textContent = '●';
+                    statusEl.className = 'text-2xl font-bold text-green-600';
+                } else {
+                    statusEl.textContent = '●';
+                    statusEl.className = 'text-2xl font-bold text-yellow-500 pulse-dot';
+                }
+            } catch {
+                const statusEl = document.getElementById('flowable-status');
+                statusEl.textContent = '○';
+                statusEl.className = 'text-2xl font-bold text-gray-400';
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadScenarios();
             loadCallScenarios();
+            checkFlowableStatus();
 
             // Refresh stats every 10 seconds
             setInterval(loadStats, 10000);
+            setInterval(checkFlowableStatus, 15000);
         });
     </script>
 </body>
