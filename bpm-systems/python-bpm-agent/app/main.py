@@ -468,13 +468,21 @@ async def start_flowable_process(request: IntakeRequest):
         flowable_user = os.getenv("FLOWABLE_USER", "admin")
         flowable_pass = os.getenv("FLOWABLE_PASS", "test")
 
+        # Force source to 'text' for Flowable gateway (audio path needs audioPath variable)
+        # The original source is preserved for AI analysis above
+        flowable_source = "text" if request.source in ["phone", "audio"] else request.source
+
         process_payload = {
-            "processDefinitionKey": "advancedIntakeProcess",
+            "processDefinitionKey": "demoIntakeProcess",
             "variables": [
                 {"name": "question", "value": request.text},
                 {"name": "customerId", "value": request.customer_id},
-                {"name": "source", "value": request.source},
-                {"name": "agentType", "value": "auto"}
+                {"name": "source", "value": flowable_source},
+                {"name": "agentType", "value": "auto"},
+                {"name": "aiCategory", "value": decision.category},
+                {"name": "aiPriority", "value": decision.priority},
+                {"name": "intent", "value": decision.intent},
+                {"name": "reasoning", "value": decision.reasoning or "AI analysis complete"}
             ]
         }
 

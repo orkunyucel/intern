@@ -1,0 +1,433 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="http://www.flowable.org/processdef">
+
+  <process id="demoIntakeProcess" name="🚀 AI-Powered Intake (Demo)" isExecutable="true">
+
+    <documentation>AI-Powered Intelligent Intake Process - Full Pipeline Demo</documentation>
+
+    <!-- ==================== START ==================== -->
+    <startEvent id="start" name="📥 Customer Request"/>
+    <sequenceFlow id="f1" sourceRef="start" targetRef="sourceGateway"/>
+
+    <!-- ==================== SOURCE GATEWAY ==================== -->
+    <exclusiveGateway id="sourceGateway" name="📞 Audio / Text?"/>
+
+    <sequenceFlow id="audioPath" name="Audio" sourceRef="sourceGateway" targetRef="speechToText">
+      <conditionExpression xsi:type="tFormalExpression">${source == 'phone' || source == 'audio'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="textPath" name="Text" sourceRef="sourceGateway" targetRef="sentimentAnalysis">
+      <conditionExpression xsi:type="tFormalExpression">${source == 'text' || source == 'form' || source == 'email'}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- ==================== AUDIO BRANCH ==================== -->
+    <serviceTask id="speechToText" name="🎤 Speech-to-Text" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>STT complete</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="parseTranscription" name="📝 Parse Transcription" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Parse complete</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="f_stt_parse" sourceRef="speechToText" targetRef="parseTranscription"/>
+    <sequenceFlow id="f_parse_sent" sourceRef="parseTranscription" targetRef="sentimentAnalysis"/>
+
+    <!-- ==================== AI PIPELINE ==================== -->
+    <serviceTask id="sentimentAnalysis" name="😊 Sentiment Analysis" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Sentiment analyzed</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="generateEmbedding" name="🧮 Generate Embedding" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Embedding done</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="qdrantSearch" name="🔍 Qdrant Search" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Search done</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="rerankResults" name="🔄 Rerank Results" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Rerank done</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="buildRagContext" name="📚 Build RAG Context" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>RAG context built</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="llmDecision" name="🤖 Gemini LLM Decision" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>LLM decided</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="subCategorization" name="🏢 Sub-Categorization" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Sub-category set</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- Pipeline flow -->
+    <sequenceFlow id="f_sent_emb" sourceRef="sentimentAnalysis" targetRef="generateEmbedding"/>
+    <sequenceFlow id="f_emb_qs" sourceRef="generateEmbedding" targetRef="qdrantSearch"/>
+    <sequenceFlow id="f_qs_rr" sourceRef="qdrantSearch" targetRef="rerankResults"/>
+    <sequenceFlow id="f_rr_rag" sourceRef="rerankResults" targetRef="buildRagContext"/>
+    <sequenceFlow id="f_rag_llm" sourceRef="buildRagContext" targetRef="llmDecision"/>
+    <sequenceFlow id="f_llm_sub" sourceRef="llmDecision" targetRef="subCategorization"/>
+    <sequenceFlow id="f_sub_par" sourceRef="subCategorization" targetRef="parallelSplit"/>
+
+    <!-- ==================== PARALLEL MCP TOOLS ==================== -->
+    <parallelGateway id="parallelSplit" name="⚙️ Execute MCP Tools"/>
+
+    <serviceTask id="updateCategory" name="📁 Update Category" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Category updated</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="setPriority" name="⚡ Set Priority" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Priority set</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <serviceTask id="createTask" name="� Create Task" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Task created</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="f_par_cat" sourceRef="parallelSplit" targetRef="updateCategory"/>
+    <sequenceFlow id="f_par_pri" sourceRef="parallelSplit" targetRef="setPriority"/>
+    <sequenceFlow id="f_par_task" sourceRef="parallelSplit" targetRef="createTask"/>
+
+    <parallelGateway id="parallelJoin" name="⚙️ Join"/>
+
+    <sequenceFlow id="f_cat_join" sourceRef="updateCategory" targetRef="parallelJoin"/>
+    <sequenceFlow id="f_pri_join" sourceRef="setPriority" targetRef="parallelJoin"/>
+    <sequenceFlow id="f_task_join" sourceRef="createTask" targetRef="parallelJoin"/>
+
+    <sequenceFlow id="f_join_route" sourceRef="parallelJoin" targetRef="priorityRouting"/>
+
+    <!-- ==================== PRIORITY ROUTING ==================== -->
+    <exclusiveGateway id="priorityRouting" name="⚡ Priority?"/>
+
+    <sequenceFlow id="urgentFlow" name="URGENT" sourceRef="priorityRouting" targetRef="urgentTask">
+      <conditionExpression xsi:type="tFormalExpression">${aiPriority == 'URGENT'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="highFlow" name="HIGH" sourceRef="priorityRouting" targetRef="highTask">
+      <conditionExpression xsi:type="tFormalExpression">${aiPriority == 'HIGH'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="mediumFlow" name="MEDIUM" sourceRef="priorityRouting" targetRef="mediumTask">
+      <conditionExpression xsi:type="tFormalExpression">${aiPriority == 'MEDIUM'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="lowFlow" name="LOW" sourceRef="priorityRouting" targetRef="lowTask">
+      <conditionExpression xsi:type="tFormalExpression">${aiPriority == 'LOW' || (aiPriority != 'URGENT' &amp;&amp; aiPriority != 'HIGH' &amp;&amp; aiPriority != 'MEDIUM')}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- ==================== USER TASKS ==================== -->
+    <userTask id="urgentTask" name="🔴 URGENT: ${aiCategory}" flowable:candidateGroups="emergency-team">
+      <documentation>🔴 URGENT - Customer: ${customerId} | ${question} | Intent: ${intent}</documentation>
+    </userTask>
+    <userTask id="highTask" name="🟠 HIGH: ${aiCategory}" flowable:candidateGroups="managers">
+      <documentation>🟠 HIGH - Customer: ${customerId} | ${question} | Intent: ${intent}</documentation>
+    </userTask>
+    <userTask id="mediumTask" name="🟢 MEDIUM: ${aiCategory}" flowable:candidateGroups="support-team">
+      <documentation>🟢 MEDIUM - Customer: ${customerId} | ${question} | Intent: ${intent}</documentation>
+    </userTask>
+    <userTask id="lowTask" name="🔵 LOW: ${aiCategory}" flowable:candidateGroups="support-team">
+      <documentation>🔵 LOW - Customer: ${customerId} | ${question} | Intent: ${intent}</documentation>
+    </userTask>
+
+    <!-- ==================== STORE & END ==================== -->
+    <exclusiveGateway id="taskJoin"/>
+
+    <sequenceFlow id="f_urg_join" sourceRef="urgentTask" targetRef="taskJoin"/>
+    <sequenceFlow id="f_high_join" sourceRef="highTask" targetRef="taskJoin"/>
+    <sequenceFlow id="f_med_join" sourceRef="mediumTask" targetRef="taskJoin"/>
+    <sequenceFlow id="f_low_join" sourceRef="lowTask" targetRef="taskJoin"/>
+
+    <serviceTask id="storeVectorDb" name="💾 Store to Vector DB" flowable:type="shell">
+      <extensionElements>
+        <flowable:field name="command"><flowable:string>echo</flowable:string></flowable:field>
+        <flowable:field name="arg1"><flowable:string>Stored</flowable:string></flowable:field>
+        <flowable:field name="wait"><flowable:string>true</flowable:string></flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="f_taskjoin_store" sourceRef="taskJoin" targetRef="storeVectorDb"/>
+    <sequenceFlow id="f_store_end" sourceRef="storeVectorDb" targetRef="end"/>
+
+    <endEvent id="end" name="✅ Complete"/>
+
+  </process>
+
+  <!-- ==================== DIAGRAM LAYOUT ==================== -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_demo">
+    <bpmndi:BPMNPlane bpmnElement="demoIntakeProcess" id="BPMNPlane_demo">
+
+      <!-- START -->
+      <bpmndi:BPMNShape bpmnElement="start" id="s_start">
+        <omgdc:Bounds height="30.0" width="30.0" x="50.0" y="345.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- SOURCE GATEWAY -->
+      <bpmndi:BPMNShape bpmnElement="sourceGateway" id="s_srcGw">
+        <omgdc:Bounds height="40.0" width="40.0" x="120.0" y="340.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- AUDIO PATH -->
+      <bpmndi:BPMNShape bpmnElement="speechToText" id="s_stt">
+        <omgdc:Bounds height="60.0" width="130.0" x="200.0" y="200.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="parseTranscription" id="s_parse">
+        <omgdc:Bounds height="60.0" width="130.0" x="370.0" y="200.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- AI PIPELINE -->
+      <bpmndi:BPMNShape bpmnElement="sentimentAnalysis" id="s_sent">
+        <omgdc:Bounds height="60.0" width="130.0" x="200.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="generateEmbedding" id="s_emb">
+        <omgdc:Bounds height="60.0" width="130.0" x="370.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="qdrantSearch" id="s_qs">
+        <omgdc:Bounds height="60.0" width="130.0" x="540.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="rerankResults" id="s_rr">
+        <omgdc:Bounds height="60.0" width="130.0" x="710.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="buildRagContext" id="s_rag">
+        <omgdc:Bounds height="60.0" width="130.0" x="880.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="llmDecision" id="s_llm">
+        <omgdc:Bounds height="60.0" width="150.0" x="1050.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="subCategorization" id="s_sub">
+        <omgdc:Bounds height="60.0" width="130.0" x="1240.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- PARALLEL MCP -->
+      <bpmndi:BPMNShape bpmnElement="parallelSplit" id="s_psplit">
+        <omgdc:Bounds height="40.0" width="40.0" x="1410.0" y="340.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="updateCategory" id="s_cat">
+        <omgdc:Bounds height="60.0" width="130.0" x="1490.0" y="230.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="setPriority" id="s_pri">
+        <omgdc:Bounds height="60.0" width="130.0" x="1490.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="createTask" id="s_ct">
+        <omgdc:Bounds height="60.0" width="130.0" x="1490.0" y="430.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="parallelJoin" id="s_pjoin">
+        <omgdc:Bounds height="40.0" width="40.0" x="1660.0" y="340.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- PRIORITY ROUTING -->
+      <bpmndi:BPMNShape bpmnElement="priorityRouting" id="s_prGw">
+        <omgdc:Bounds height="40.0" width="40.0" x="1740.0" y="340.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- USER TASKS -->
+      <bpmndi:BPMNShape bpmnElement="urgentTask" id="s_urg">
+        <omgdc:Bounds height="60.0" width="160.0" x="1830.0" y="150.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="highTask" id="s_high">
+        <omgdc:Bounds height="60.0" width="160.0" x="1830.0" y="260.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="mediumTask" id="s_med">
+        <omgdc:Bounds height="60.0" width="160.0" x="1830.0" y="380.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="lowTask" id="s_low">
+        <omgdc:Bounds height="60.0" width="160.0" x="1830.0" y="490.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- STORE & END -->
+      <bpmndi:BPMNShape bpmnElement="taskJoin" id="s_tjoin">
+        <omgdc:Bounds height="40.0" width="40.0" x="2040.0" y="340.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="storeVectorDb" id="s_store">
+        <omgdc:Bounds height="60.0" width="140.0" x="2120.0" y="330.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="end" id="s_end">
+        <omgdc:Bounds height="30.0" width="30.0" x="2300.0" y="345.0"/>
+      </bpmndi:BPMNShape>
+
+      <!-- ============ EDGES ============ -->
+      <bpmndi:BPMNEdge bpmnElement="f1" id="e_f1">
+        <omgdi:waypoint x="80.0" y="360.0"/>
+        <omgdi:waypoint x="120.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="audioPath" id="e_audio">
+        <omgdi:waypoint x="140.0" y="340.0"/>
+        <omgdi:waypoint x="140.0" y="230.0"/>
+        <omgdi:waypoint x="200.0" y="230.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="textPath" id="e_text">
+        <omgdi:waypoint x="160.0" y="360.0"/>
+        <omgdi:waypoint x="200.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_stt_parse" id="e_stt_parse">
+        <omgdi:waypoint x="330.0" y="230.0"/>
+        <omgdi:waypoint x="370.0" y="230.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_parse_sent" id="e_parse_sent">
+        <omgdi:waypoint x="435.0" y="260.0"/>
+        <omgdi:waypoint x="435.0" y="295.0"/>
+        <omgdi:waypoint x="265.0" y="295.0"/>
+        <omgdi:waypoint x="265.0" y="330.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_sent_emb" id="e_sent_emb">
+        <omgdi:waypoint x="330.0" y="360.0"/>
+        <omgdi:waypoint x="370.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_emb_qs" id="e_emb_qs">
+        <omgdi:waypoint x="500.0" y="360.0"/>
+        <omgdi:waypoint x="540.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_qs_rr" id="e_qs_rr">
+        <omgdi:waypoint x="670.0" y="360.0"/>
+        <omgdi:waypoint x="710.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_rr_rag" id="e_rr_rag">
+        <omgdi:waypoint x="840.0" y="360.0"/>
+        <omgdi:waypoint x="880.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_rag_llm" id="e_rag_llm">
+        <omgdi:waypoint x="1010.0" y="360.0"/>
+        <omgdi:waypoint x="1050.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_llm_sub" id="e_llm_sub">
+        <omgdi:waypoint x="1200.0" y="360.0"/>
+        <omgdi:waypoint x="1240.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_sub_par" id="e_sub_par">
+        <omgdi:waypoint x="1370.0" y="360.0"/>
+        <omgdi:waypoint x="1410.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_par_cat" id="e_par_cat">
+        <omgdi:waypoint x="1430.0" y="340.0"/>
+        <omgdi:waypoint x="1430.0" y="260.0"/>
+        <omgdi:waypoint x="1490.0" y="260.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_par_pri" id="e_par_pri">
+        <omgdi:waypoint x="1450.0" y="360.0"/>
+        <omgdi:waypoint x="1490.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_par_task" id="e_par_task">
+        <omgdi:waypoint x="1430.0" y="380.0"/>
+        <omgdi:waypoint x="1430.0" y="460.0"/>
+        <omgdi:waypoint x="1490.0" y="460.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_cat_join" id="e_cat_join">
+        <omgdi:waypoint x="1620.0" y="260.0"/>
+        <omgdi:waypoint x="1680.0" y="260.0"/>
+        <omgdi:waypoint x="1680.0" y="340.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_pri_join" id="e_pri_join">
+        <omgdi:waypoint x="1620.0" y="360.0"/>
+        <omgdi:waypoint x="1660.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_task_join" id="e_task_join">
+        <omgdi:waypoint x="1620.0" y="460.0"/>
+        <omgdi:waypoint x="1680.0" y="460.0"/>
+        <omgdi:waypoint x="1680.0" y="380.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_join_route" id="e_join_route">
+        <omgdi:waypoint x="1700.0" y="360.0"/>
+        <omgdi:waypoint x="1740.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="urgentFlow" id="e_urg">
+        <omgdi:waypoint x="1760.0" y="340.0"/>
+        <omgdi:waypoint x="1760.0" y="180.0"/>
+        <omgdi:waypoint x="1830.0" y="180.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="highFlow" id="e_high">
+        <omgdi:waypoint x="1760.0" y="340.0"/>
+        <omgdi:waypoint x="1760.0" y="290.0"/>
+        <omgdi:waypoint x="1830.0" y="290.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="mediumFlow" id="e_med">
+        <omgdi:waypoint x="1760.0" y="380.0"/>
+        <omgdi:waypoint x="1760.0" y="410.0"/>
+        <omgdi:waypoint x="1830.0" y="410.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="lowFlow" id="e_low">
+        <omgdi:waypoint x="1760.0" y="380.0"/>
+        <omgdi:waypoint x="1760.0" y="520.0"/>
+        <omgdi:waypoint x="1830.0" y="520.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_urg_join" id="e_urg_j">
+        <omgdi:waypoint x="1990.0" y="180.0"/>
+        <omgdi:waypoint x="2060.0" y="180.0"/>
+        <omgdi:waypoint x="2060.0" y="340.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_high_join" id="e_high_j">
+        <omgdi:waypoint x="1990.0" y="290.0"/>
+        <omgdi:waypoint x="2060.0" y="290.0"/>
+        <omgdi:waypoint x="2060.0" y="340.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_med_join" id="e_med_j">
+        <omgdi:waypoint x="1990.0" y="410.0"/>
+        <omgdi:waypoint x="2060.0" y="410.0"/>
+        <omgdi:waypoint x="2060.0" y="380.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_low_join" id="e_low_j">
+        <omgdi:waypoint x="1990.0" y="520.0"/>
+        <omgdi:waypoint x="2060.0" y="520.0"/>
+        <omgdi:waypoint x="2060.0" y="380.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_taskjoin_store" id="e_tj_store">
+        <omgdi:waypoint x="2080.0" y="360.0"/>
+        <omgdi:waypoint x="2120.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="f_store_end" id="e_store_end">
+        <omgdi:waypoint x="2260.0" y="360.0"/>
+        <omgdi:waypoint x="2300.0" y="360.0"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

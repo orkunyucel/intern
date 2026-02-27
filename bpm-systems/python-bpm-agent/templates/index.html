@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,47 +12,77 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
+
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
+
         .card-shadow {
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         }
+
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             transition: transform 0.2s, box-shadow 0.2s;
         }
+
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
         }
-        .badge-urgent { background: #ef4444; }
-        .badge-high { background: #f59e0b; }
-        .badge-medium { background: #3b82f6; }
-        .badge-low { background: #10b981; }
+
+        .badge-urgent {
+            background: #ef4444;
+        }
+
+        .badge-high {
+            background: #f59e0b;
+        }
+
+        .badge-medium {
+            background: #3b82f6;
+        }
+
+        .badge-low {
+            background: #10b981;
+        }
+
         .btn-flowable {
             background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
             transition: transform 0.2s, box-shadow 0.2s;
         }
+
         .btn-flowable:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
         }
+
         .flowable-link {
             background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
             transition: transform 0.2s, box-shadow 0.2s;
         }
+
         .flowable-link:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
         }
+
         .pulse-dot {
             animation: pulse 2s ease-in-out infinite;
         }
+
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
+
         .loading {
             border: 3px solid #f3f4f6;
             border-top: 3px solid #667eea;
@@ -60,23 +91,40 @@
             height: 40px;
             animation: spin 1s linear infinite;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
+
         .wave {
             animation: wave 1.5s ease-in-out infinite;
         }
+
         @keyframes wave {
-            0%, 100% { transform: scaleY(0.5); }
-            50% { transform: scaleY(1); }
+
+            0%,
+            100% {
+                transform: scaleY(0.5);
+            }
+
+            50% {
+                transform: scaleY(1);
+            }
         }
+
         .tab-active {
             border-bottom: 3px solid #667eea;
             color: #667eea;
         }
     </style>
 </head>
+
 <body class="bg-gray-50">
     <!-- Header -->
     <div class="gradient-bg text-white py-6 mb-8">
@@ -231,20 +279,25 @@
                         <h2 class="text-xl font-bold mb-4 flex items-center">
                             <span class="mr-2">🚀</span> Flowable'a Talep Gönder
                         </h2>
-                        <p class="text-sm text-gray-500 mb-4">Bir müşteri talebi yazın. AI analiz edecek ve Flowable BPM'de süreç başlatacak.</p>
+                        <p class="text-sm text-gray-500 mb-4">Bir müşteri talebi yazın. AI analiz edecek ve Flowable
+                            BPM'de süreç başlatacak.</p>
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-1">Müşteri Talebi</label>
-                                <textarea id="flowable-text" rows="4" class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors" placeholder="Örn: 3 gündür internetim yok, acil yardım istiyorum!"></textarea>
+                                <textarea id="flowable-text" rows="4"
+                                    class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors"
+                                    placeholder="Örn: 3 gündür internetim yok, acil yardım istiyorum!"></textarea>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-1">Müşteri ID</label>
-                                    <input id="flowable-customer" type="text" value="CUST-DEMO-001" class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors" />
+                                    <input id="flowable-customer" type="text" value="CUST-DEMO-001"
+                                        class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-1">Kaynak</label>
-                                    <select id="flowable-source" class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors">
+                                    <select id="flowable-source"
+                                        class="w-full border-2 border-gray-200 rounded-lg p-3 focus:border-purple-500 focus:outline-none transition-colors">
                                         <option value="text">📝 Text</option>
                                         <option value="phone">📞 Phone</option>
                                         <option value="email">📧 Email</option>
@@ -252,7 +305,8 @@
                                     </select>
                                 </div>
                             </div>
-                            <button onclick="sendToFlowable()" id="flowable-submit-btn" class="w-full btn-flowable text-white font-bold py-3 px-6 rounded-lg text-lg">
+                            <button onclick="sendToFlowable()" id="flowable-submit-btn"
+                                class="w-full btn-flowable text-white font-bold py-3 px-6 rounded-lg text-lg">
                                 🚀 AI Analiz Et & Flowable'a Gönder
                             </button>
                         </div>
@@ -262,16 +316,24 @@
                     <div class="bg-white rounded-xl p-6 card-shadow">
                         <h3 class="text-sm font-bold text-gray-600 mb-3">⚡ Hızlı Test Senaryoları</h3>
                         <div class="space-y-2">
-                            <button onclick="fillFlowableScenario('3 gündür internetim yok, iş yapamıyorum, çok sinirliyim!', 'phone')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all text-sm">
+                            <button
+                                onclick="fillFlowableScenario('3 gündür internetim yok, iş yapamıyorum, çok sinirliyim!', 'phone')"
+                                class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all text-sm">
                                 🔴 <strong>URGENT:</strong> İnternet kesintisi (sinirli müşteri)
                             </button>
-                            <button onclick="fillFlowableScenario('Faturamda yanlış bir tutar var, düzeltilmesini istiyorum.', 'email')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-yellow-400 hover:bg-yellow-50 transition-all text-sm">
+                            <button
+                                onclick="fillFlowableScenario('Faturamda yanlış bir tutar var, düzeltilmesini istiyorum.', 'email')"
+                                class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-yellow-400 hover:bg-yellow-50 transition-all text-sm">
                                 🟠 <strong>MEDIUM:</strong> Fatura hatası
                             </button>
-                            <button onclick="fillFlowableScenario('Yıllık izin talebimi iletmek istiyorum, 5-10 Mart arası.', 'form')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-green-400 hover:bg-green-50 transition-all text-sm">
+                            <button
+                                onclick="fillFlowableScenario('Yıllık izin talebimi iletmek istiyorum, 5-10 Mart arası.', 'form')"
+                                class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-green-400 hover:bg-green-50 transition-all text-sm">
                                 🟢 <strong>LOW:</strong> İzin talebi
                             </button>
-                            <button onclick="fillFlowableScenario('Sunucu tamamen çöktü, hiçbir sistem çalışmıyor, tüm ekip bekliyor!', 'phone')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all text-sm">
+                            <button
+                                onclick="fillFlowableScenario('Sunucu tamamen çöktü, hiçbir sistem çalışmıyor, tüm ekip bekliyor!', 'phone')"
+                                class="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all text-sm">
                                 🔴 <strong>URGENT:</strong> Sunucu çökmesi
                             </button>
                         </div>
@@ -288,7 +350,8 @@
                             <div class="text-center py-16 text-gray-400">
                                 <div class="text-6xl mb-4">⚙️</div>
                                 <p class="text-lg">Bir talep yazın ve Flowable'a gönderin</p>
-                                <p class="text-sm mt-2">AI analiz edecek → Flowable'da süreç başlatılacak → Task oluşacak</p>
+                                <p class="text-sm mt-2">AI analiz edecek → Flowable'da süreç başlatılacak → Task
+                                    oluşacak</p>
                             </div>
                         </div>
                     </div>
@@ -310,7 +373,7 @@
             tabs.forEach(t => {
                 const tabBtn = document.getElementById(`tab-${t}`);
                 const content = document.getElementById(`${t}-content`);
-                
+
                 tabBtn.classList.remove('tab-active');
                 tabBtn.classList.add('text-gray-500');
                 content.classList.add('hidden');
@@ -320,11 +383,11 @@
             // Activate selected tab
             const activeTabBtn = document.getElementById(`tab-${tab}`);
             const activeContent = document.getElementById(`${tab}-content`);
-            
+
             activeTabBtn.classList.add('tab-active');
             activeTabBtn.classList.remove('text-gray-500');
             activeContent.classList.remove('hidden');
-            
+
             if (tab !== 'upload') {
                 activeContent.classList.add('grid');
             }
@@ -722,7 +785,7 @@
                         text: text,
                         customer_id: customerId,
                         source: source,
-                        sentiment: 'neutral'
+                        sentiment: 'NEUTRAL'
                     })
                 });
 
@@ -856,4 +919,5 @@
         });
     </script>
 </body>
+
 </html>
